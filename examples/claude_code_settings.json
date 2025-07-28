@@ -1,0 +1,123 @@
+{
+  "name": "QuickHooks Agent Analysis Integration",
+  "description": "Automatically analyzes prompts and recommends/uses appropriate agents from ~/.claude/agents",
+  "version": "1.0.0",
+  "hooks": {
+    "user-prompt-submit": {
+      "script": "~/.quickhooks/hooks/agent_analysis_hook.py",
+      "function": "on_user_prompt_submit",
+      "enabled": true,
+      "description": "Analyzes user prompts and modifies them to use appropriate agents"
+    }
+  },
+  "environment": {
+    "GROQ_API_KEY": "${GROQ_API_KEY}",
+    "QUICKHOOKS_AGENT_ANALYSIS_ENABLED": "true",
+    "QUICKHOOKS_AGENT_MODEL": "qwen/qwen3-32b",
+    "QUICKHOOKS_CONFIDENCE_THRESHOLD": "0.7",
+    "QUICKHOOKS_MIN_SIMILARITY": "0.3",
+    "QUICKHOOKS_VERBOSE": "false"
+  },
+  "settings": {
+    "agent_analysis": {
+      "enabled": true,
+      "model": "qwen/qwen3-32b",
+      "confidence_threshold": 0.7,
+      "min_similarity": 0.3,
+      "agents_directory": "~/.claude/agents",
+      "database_path": "~/.quickhooks/agent_db",
+      "verbose_logging": false,
+      "skip_patterns": [
+        "agent",
+        "use.*agent",
+        "with.*agent"
+      ],
+      "min_prompt_length": 10
+    }
+  },
+  "dependencies": {
+    "quickhooks": ">=0.1.0",
+    "groq": ">=0.13.0",
+    "pydantic-ai-slim[groq]": ">=0.0.49",
+    "chromadb": ">=0.4.0",
+    "sentence-transformers": ">=2.2.0"
+  },
+  "installation": {
+    "instructions": [
+      "1. Install QuickHooks with agent analysis dependencies:",
+      "   pip install quickhooks[agent-analysis]",
+      "2. Set your Groq API key:",
+      "   export GROQ_API_KEY=your_groq_api_key_here",
+      "3. Copy the hook to your QuickHooks directory:",
+      "   cp hooks/agent_analysis_hook.py ~/.quickhooks/hooks/",
+      "4. Update your Claude Code settings.json with this configuration",
+      "5. Test the integration:",
+      "   quickhooks agents analyze 'Write a Python function'"
+    ]
+  },
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "issue": "GROQ_API_KEY not set",
+        "solution": "Set the GROQ_API_KEY environment variable with your Groq API key"
+      },
+      {
+        "issue": "QuickHooks not found",
+        "solution": "Install QuickHooks: pip install quickhooks[agent-analysis]"
+      },
+      {
+        "issue": "No agents discovered",
+        "solution": "Ensure you have agents in ~/.claude/agents directory"
+      },
+      {
+        "issue": "Hook not triggering",
+        "solution": "Check that QUICKHOOKS_AGENT_ANALYSIS_ENABLED=true and hook is properly registered"
+      }
+    ]
+  },
+  "examples": {
+    "basic_usage": {
+      "input": "Write a Python function that calculates factorial",
+      "expected_output": "Use the 'python_expert' agent to write a Python function that calculates factorial. The agent is located at ~/.claude/agents/python_expert.py and specializes in: coding, python, algorithms."
+    },
+    "debugging_task": {
+      "input": "Help me debug this authentication error",
+      "expected_output": "Use the 'debug_helper' agent to help me debug this authentication error. The agent is located at ~/.claude/agents/debug_helper.py and specializes in: debugging, troubleshooting, authentication."
+    }
+  },
+  "configuration_options": {
+    "QUICKHOOKS_AGENT_ANALYSIS_ENABLED": {
+      "type": "boolean",
+      "default": "true",
+      "description": "Enable or disable automatic agent analysis"
+    },
+    "QUICKHOOKS_AGENT_MODEL": {
+      "type": "string", 
+      "default": "qwen/qwen3-32b",
+      "description": "Groq model to use for agent analysis",
+      "options": [
+        "qwen/qwen3-32b",
+        "llama-3.3-70b-versatile",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it"
+      ]
+    },
+    "QUICKHOOKS_CONFIDENCE_THRESHOLD": {
+      "type": "float",
+      "default": "0.7",
+      "range": [0.0, 1.0],
+      "description": "Minimum confidence threshold for agent recommendations"
+    },
+    "QUICKHOOKS_MIN_SIMILARITY": {
+      "type": "float", 
+      "default": "0.3",
+      "range": [0.0, 1.0],
+      "description": "Minimum similarity score for discovered agents"
+    },
+    "QUICKHOOKS_VERBOSE": {
+      "type": "boolean",
+      "default": "false", 
+      "description": "Enable verbose logging of agent analysis results"
+    }
+  }
+}

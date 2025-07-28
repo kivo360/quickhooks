@@ -1,0 +1,132 @@
+# QuickHooks Configuration with Context Portal Memory Management
+# This configuration enables automatic project memory management using Context Portal
+
+hooks:
+  directory: "hooks"
+  timeout: 30.0
+  
+  # Pre-tool-use hooks run before Claude Code executes tools
+  pre_tool_use:
+    # Context Portal Memory Hook - captures and enhances tool usage with project context
+    - name: "context_portal_memory"
+      script: "context_portal_memory.py"
+      enabled: true
+      description: "Manages project memory using Context Portal database backend"
+      
+      # Apply to all major Claude Code tools
+      tool_filters: [
+        "Bash",      # Command execution
+        "Edit",      # File editing
+        "Write",     # File creation
+        "Read",      # File reading
+        "Grep",      # Text search
+        "Glob",      # File pattern matching
+        "Task",      # Agent task delegation
+        "WebFetch",  # Web content fetching
+        "WebSearch"  # Web searching
+      ]
+      
+      # Environment variables for the hook
+      environment:
+        CONTEXT_PORTAL_DB_PATH: ".context-portal/project.db"
+        CONTEXT_PORTAL_SESSION_ID: "auto"  # Auto-generate session IDs
+        CONTEXT_PORTAL_ENABLE_DECISIONS: "true"
+        CONTEXT_PORTAL_ENABLE_PATTERNS: "true"
+        CONTEXT_PORTAL_ENABLE_TASKS: "true"
+        CONTEXT_PORTAL_ENABLE_CONTEXT: "true"
+        CONTEXT_PORTAL_MAX_CONTEXT_ENTRIES: "10"
+        DEBUG_CONTEXT_PORTAL: "false"
+    
+    # Optional: Keep the grep-to-ripgrep hook for command optimization
+    - name: "grep_to_ripgrep"
+      script: "grep_to_ripgrep.py"
+      enabled: true
+      tool_filters: ["Bash"]
+      environment:
+        RG_PATH: "/usr/local/bin/rg"
+        DEBUG_TRANSFORMS: "false"
+
+  # Post-tool-use hooks run after Claude Code executes tools
+  post_tool_use:
+    # Context Portal Result Processor - stores tool execution results
+    - name: "context_portal_results"
+      script: "context_portal_memory.py"
+      enabled: true
+      description: "Stores tool execution results in Context Portal for future reference"
+      
+      tool_filters: [
+        "Bash", "Edit", "Write", "Read", "Grep", "Glob", 
+        "Task", "WebFetch", "WebSearch"
+      ]
+      
+      environment:
+        CONTEXT_PORTAL_MODE: "post_execution"
+        CONTEXT_PORTAL_STORE_RESULTS: "true"
+        CONTEXT_PORTAL_RESULT_LIMIT: "1000"  # Max chars to store from results
+
+# Optional: Global hook settings
+settings:
+  # Enable parallel hook execution for better performance
+  parallel_execution: true
+  
+  # Maximum time to wait for all hooks to complete
+  global_timeout: 60.0
+  
+  # Hook execution order (lower numbers run first)
+  execution_order:
+    context_portal_memory: 1
+    grep_to_ripgrep: 2
+    context_portal_results: 999  # Run last to capture final results
+  
+  # Logging configuration
+  logging:
+    level: "INFO"
+    file: ".context-portal/hooks.log"
+    rotate_size: "10MB"
+    backup_count: 5
+
+# Project-specific Context Portal configuration
+context_portal:
+  # Database configuration
+  database:
+    path: ".context-portal/project.db"
+    backup_interval: "daily"
+    max_size: "100MB"
+    vacuum_interval: "weekly"
+  
+  # Memory management settings
+  memory:
+    max_decisions: 1000
+    max_tasks: 500
+    max_patterns: 200
+    max_context_entries: 2000
+    cleanup_interval: "monthly"
+  
+  # Search and retrieval settings
+  search:
+    default_limit: 10
+    max_limit: 50
+    similarity_threshold: 0.7
+    enable_fuzzy_search: true
+  
+  # Categories for organizing content
+  categories:
+    decisions:
+      - "architecture"
+      - "technical"
+      - "tooling"
+      - "deployment"
+      - "security"
+    
+    patterns:
+      - "design_patterns"
+      - "code_patterns"
+      - "test_patterns"
+      - "deployment_patterns"
+    
+    tasks:
+      - "development"
+      - "testing"
+      - "deployment"
+      - "documentation"
+      - "maintenance"

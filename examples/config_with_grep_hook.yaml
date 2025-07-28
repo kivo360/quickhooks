@@ -1,0 +1,88 @@
+# QuickHooks Configuration Example: Grep to Ripgrep Hook
+# 
+# This configuration demonstrates how to set up the grep-to-ripgrep hook
+# as a pre-tool-use hook that automatically transforms grep commands to
+# use ripgrep (rg) for faster and more efficient searching.
+#
+# Usage:
+#   1. Save this file as quickhooks.yaml in your project root
+#   2. Ensure the grep_to_ripgrep.py hook is in the hooks/ directory
+#   3. Install ripgrep: brew install ripgrep (or equivalent)
+#   4. Run your tools - grep commands will be automatically transformed!
+
+# Database configuration
+database:
+  url: "sqlite:///quickhooks.db"
+  pool_size: 10
+  max_overflow: 20
+  echo: false
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "quickhooks.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# Hook configuration
+hooks:
+  # Directory where hook scripts are located
+  directory: "hooks"
+  
+  # Timeout for hook execution (seconds)
+  timeout: 30.0
+  
+  # Pre-tool-use hooks (executed before tool usage)
+  pre_tool_use:
+    - name: "grep_to_ripgrep"
+      script: "grep_to_ripgrep.py"
+      description: "Transform grep commands to use ripgrep for better performance"
+      enabled: true
+      # Optional: specify which tools this hook applies to
+      tool_filters:
+        - "Bash"
+      # Optional: environment variables for the hook
+      environment:
+        RG_PATH: "/usr/local/bin/rg"  # Custom ripgrep path if needed
+        DEBUG_TRANSFORMS: "false"      # Enable debugging output
+      
+  # Post-tool-use hooks (executed after tool usage)
+  post_tool_use: []
+  
+  # Event hooks (executed on specific events)
+  event_hooks: []
+
+# Development configuration
+development:
+  hot_reload: true
+  debug_mode: false
+  test_mode: false
+  mock_external_services: false
+
+# Optional: Additional hook configurations for different environments
+environments:
+  development:
+    hooks:
+      pre_tool_use:
+        - name: "grep_to_ripgrep"
+          script: "grep_to_ripgrep.py"
+          enabled: true
+          environment:
+            DEBUG_TRANSFORMS: "true"  # Enable debug output in dev
+            
+  production:
+    hooks:
+      pre_tool_use:
+        - name: "grep_to_ripgrep"
+          script: "grep_to_ripgrep.py"
+          enabled: true
+          environment:
+            DEBUG_TRANSFORMS: "false"
+            
+  testing:
+    hooks:
+      pre_tool_use:
+        - name: "grep_to_ripgrep"
+          script: "grep_to_ripgrep.py"
+          enabled: false  # Disable transformations during testing

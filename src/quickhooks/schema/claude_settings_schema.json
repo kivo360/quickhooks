@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://json.schemastore.org/claude-code-settings.json",
+  "type": "object",
+  "description": "Configuration file for Claude Code CLI settings",
+  "allowTrailingCommas": true,
+  "additionalProperties": true,
+  "$defs": {
+    "hookCommand": {
+      "type": "object",
+      "required": ["type", "command"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "command"
+        },
+        "command": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "hookMatcher": {
+      "type": "object",
+      "required": ["hooks"],
+      "properties": {
+        "matcher": {
+          "type": "string"
+        },
+        "hooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookCommand"
+          }
+        }
+      }
+    },
+    "permissionRule": {
+      "type": "string",
+      "pattern": "^(Agent|Bash|Edit|Glob|Grep|LS|MultiEdit|NotebookEdit|NotebookRead|Read|TodoRead|TodoWrite|WebFetch|WebSearch|Write)(\\(.*\\))?$|^mcp__.*$"
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "apiKeyHelper": {
+      "type": "string"
+    },
+    "cleanupPeriodDays": {
+      "type": "integer",
+      "default": 30,
+      "minimum": 0
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[A-Z_][A-Z0-9_]*$": {
+          "type": "string"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "PreToolUse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "PostToolUse": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "Notification": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "UserPromptSubmit": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "Stop": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "SubagentStop": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "PreCompact": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        }
+      }
+    },
+    "includeCoAuthoredBy": {
+      "type": "boolean",
+      "default": false
+    },
+    "model": {
+      "type": "string",
+      "enum": ["haiku", "sonnet", "opus"],
+      "default": "sonnet"
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/permissionRule"
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/permissionRule"
+          }
+        }
+      }
+    }
+  }
+}
