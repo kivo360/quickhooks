@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Example hook for testing the CLI."""
 
-import asyncio
 import json
 import sys
 
@@ -31,7 +30,7 @@ class ExampleHook(BaseHook):
             },
         )
 
-    async def validate_input(self, input_data: HookInput) -> bool:
+    async def validate_input(self, input_data: HookInput) -> bool:  # noqa: ARG002
         """Validate the input data.
 
         Args:
@@ -49,25 +48,25 @@ def main():
     try:
         # Read JSON input from stdin (official format)
         input_data = json.loads(sys.stdin.read())
-        
+
         # Extract standard fields from official Claude Code format
-        session_id = input_data.get('session_id', 'unknown')
-        tool_name = input_data.get('tool_name', '')
-        tool_input = input_data.get('tool_input', {})
-        hook_event_name = input_data.get('hook_event_name', '')
-        transcript_path = input_data.get('transcript_path', '')
-        cwd = input_data.get('cwd', '')
-        
+        session_id = input_data.get("session_id", "unknown")
+        tool_name = input_data.get("tool_name", "")
+        input_data.get("tool_input", {})
+        input_data.get("hook_event_name", "")
+        input_data.get("transcript_path", "")
+        input_data.get("cwd", "")
+
         # Example hook logic - just log what we received
-        print(f"Example hook: Processing {tool_name} in session {session_id}", file=sys.stderr)
-        
+        print(
+            f"Example hook: Processing {tool_name} in session {session_id}",
+            file=sys.stderr,
+        )
+
         # Use official Claude Code response format
-        response = {
-            "continue": True,
-            "suppressOutput": False
-        }
+        response = {"continue": True, "suppressOutput": False}
         print(json.dumps(response))
-        
+
     except Exception as e:
         # Always fail-safe - log error but don't block execution
         print(f"Example hook error: {str(e)}", file=sys.stderr)

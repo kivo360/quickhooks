@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quickhooks.runner import TestRunner, TestResult
+from quickhooks.runner import TestResult, TestRunner
 
 
 class TestTestResult:

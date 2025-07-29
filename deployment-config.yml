@@ -1,0 +1,371 @@
+# QuickHooks Deployment Configuration
+# This file defines deployment environments, agent settings, and pipeline configurations
+
+# Project metadata
+project:
+  name: quickhooks
+  description: "A streamlined TDD framework for Claude Code hooks with real-time feedback"
+  repository: "https://github.com/user/quickhooks"
+  homepage: "https://github.com/user/quickhooks"
+  documentation: "https://github.com/user/quickhooks/blob/main/README.md"
+
+# Environment configurations
+environments:
+  development:
+    name: "Development"
+    python_version: "3.12"
+    install_dev_dependencies: true
+    run_tests: true
+    publish_to_pypi: false
+    validate_build: true
+    security_scan: false
+    parallel_agents: true
+    max_retries: 2
+    timeout: 300  # 5 minutes
+    
+    # Development-specific settings
+    settings:
+      debug: true
+      verbose_logging: true
+      skip_security_checks: true
+      allow_dirty_working_tree: true
+  
+  staging:
+    name: "Staging"
+    python_version: "3.12"
+    install_dev_dependencies: true
+    run_tests: true
+    publish_to_pypi: true
+    publish_index: "testpypi"
+    validate_build: true
+    security_scan: true
+    parallel_agents: true
+    max_retries: 3
+    timeout: 600  # 10 minutes
+    
+    # Staging-specific settings
+    settings:
+      debug: false
+      verbose_logging: true
+      skip_security_checks: false
+      allow_dirty_working_tree: false
+      require_version_bump: true
+      
+    # PyPI configuration for staging
+    pypi:
+      index_url: "https://test.pypi.org/legacy/"
+      repository_url: "https://test.pypi.org/simple/"
+      
+  production:
+    name: "Production"
+    python_version: "3.12"
+    install_dev_dependencies: false
+    run_tests: true
+    publish_to_pypi: true
+    publish_index: "pypi"
+    validate_build: true
+    security_scan: true
+    parallel_agents: true
+    max_retries: 5
+    timeout: 900  # 15 minutes
+    
+    # Production-specific settings
+    settings:
+      debug: false
+      verbose_logging: false
+      skip_security_checks: false
+      allow_dirty_working_tree: false
+      require_version_bump: true
+      require_clean_git: true
+      require_tag_match: true
+      
+    # PyPI configuration for production
+    pypi:
+      index_url: "https://upload.pypi.org/legacy/"
+      repository_url: "https://pypi.org/simple/"
+
+# Agent configurations
+agents:
+  - name: "BuildAgent"
+    type: "build"
+    max_concurrent: 1
+    priority: "high"
+    timeout: 300
+    retry_count: 3
+    retry_delay: 5
+    
+    tasks:
+      - name: "clean_dist"
+        command: ["rm", "-rf", "dist/"]
+        priority: "high"
+        
+      - name: "build_wheel"
+        command: ["uv", "build", "--wheel"]
+        priority: "high"
+        dependencies: ["clean_dist"]
+        
+      - name: "build_sdist"
+        command: ["uv", "build", "--sdist"]
+        priority: "normal"
+        dependencies: ["clean_dist"]
+        
+      - name: "verify_artifacts"
+        command: ["ls", "-la", "dist/"]
+        priority: "low"
+        dependencies: ["build_wheel", "build_sdist"]
+
+  - name: "TestAgent"
+    type: "test"
+    max_concurrent: 2
+    priority: "high"
+    timeout: 600
+    retry_count: 2
+    retry_delay: 10
+    
+    tasks:
+      - name: "unit_tests"
+        command: ["uv", "run", "pytest", "tests/", "-v", "--tb=short"]
+        priority: "critical"
+        
+      - name: "coverage_tests"
+        command: ["uv", "run", "pytest", "--cov=src/quickhooks", "--cov-report=html", "--cov-report=xml"]
+        priority: "high"
+        
+      - name: "integration_tests"
+        command: ["uv", "run", "pytest", "tests/test_integration.py", "-v"]
+        priority: "normal"
+        optional: true  # Don't fail if file doesn't exist
+        
+      - name: "performance_tests"
+        command: ["uv", "run", "pytest", "tests/test_performance.py", "-v"]
+        priority: "low"
+        optional: true
+
+  - name: "ValidationAgent"
+    type: "validate"
+    max_concurrent: 1
+    priority: "normal"
+    timeout: 300
+    retry_count: 2
+    retry_delay: 5
+    
+    tasks:
+      - name: "validate_build"
+        command: ["python", "scripts/validate-build.py", "--verbose"]
+        priority: "high"
+        
+      - name: "lint_check"
+        command: ["uv", "run", "ruff", "check", "src/", "tests/"]
+        priority: "normal"
+        
+      - name: "format_check"
+        command: ["uv", "run", "ruff", "format", "--check", "src/", "tests/"]
+        priority: "normal"
+        
+      - name: "type_check"
+        command: ["uv", "run", "mypy", "src/quickhooks"]
+        priority: "normal"
+        
+      - name: "security_scan"
+        command: ["uv", "run", "bandit", "-r", "src/", "-f", "json"]
+        priority: "low"
+        environments: ["staging", "production"]  # Only run in these envs
+
+  - name: "DeploymentAgent"
+    type: "deploy"
+    max_concurrent: 1
+    priority: "critical"
+    timeout: 900
+    retry_count: 3
+    retry_delay: 30
+    
+    tasks:
+      - name: "publish_testpypi"
+        command: ["uv", "publish", "--index", "testpypi"]
+        priority: "high"
+        environments: ["staging"]
+        
+      - name: "publish_pypi"
+        command: ["uv", "publish"]
+        priority: "critical"
+        environments: ["production"]
+        
+      - name: "verify_publication"
+        command: ["pip", "show", "quickhooks"]
+        priority: "normal"
+        delay: 60  # Wait 1 minute after publication
+
+  - name: "MonitoringAgent"
+    type: "monitor"
+    max_concurrent: 1
+    priority: "low"
+    timeout: 60
+    retry_count: 1
+    retry_delay: 5
+    
+    tasks:
+      - name: "check_git_status"
+        command: ["git", "status", "--porcelain"]
+        priority: "normal"
+        
+      - name: "check_disk_space"
+        command: ["df", "-h", "."]
+        priority: "low"
+        
+      - name: "collect_metrics"
+        command: ["python", "-c", "import sys; print(f'Python: {sys.version}')"]
+        priority: "low"
+
+# Task dependencies and execution order
+task_graph:
+  # Build phase
+  build_phase:
+    - "clean_dist"
+    - ["build_wheel", "build_sdist"]  # Parallel execution
+    - "verify_artifacts"
+  
+  # Test phase (can run in parallel with build)
+  test_phase:
+    - ["unit_tests", "coverage_tests"]  # Parallel
+    - "integration_tests"
+    - "performance_tests"
+  
+  # Validation phase (depends on build completion)
+  validation_phase:
+    depends_on: ["build_phase"]
+    tasks:
+      - "validate_build"
+      - ["lint_check", "format_check", "type_check"]  # Parallel
+      - "security_scan"
+  
+  # Deployment phase (depends on all previous phases)
+  deployment_phase:
+    depends_on: ["build_phase", "test_phase", "validation_phase"]
+    tasks:
+      - "publish_testpypi"  # Staging only
+      - "publish_pypi"      # Production only
+      - "verify_publication"
+
+# Quality gates and requirements
+quality_gates:
+  test_coverage:
+    minimum: 80
+    target: 90
+    
+  security_scan:
+    max_high_severity: 0
+    max_medium_severity: 2
+    
+  performance:
+    max_build_time: 300  # 5 minutes
+    max_test_time: 600   # 10 minutes
+    
+  code_quality:
+    max_complexity: 10
+    min_maintainability: 7
+
+# Notification settings
+notifications:
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channels:
+      success: "#deployments"
+      failure: "#alerts"
+  
+  email:
+    enabled: false
+    smtp_server: "smtp.gmail.com"
+    recipients:
+      - "dev-team@company.com"
+  
+  github:
+    enabled: true
+    create_release: true
+    update_status: true
+
+# Rollback configuration
+rollback:
+  enabled: true
+  max_rollback_versions: 5
+  automatic_rollback:
+    enabled: false
+    failure_threshold: 3
+    health_check_interval: 60
+    
+  manual_rollback:
+    require_approval: true
+    approval_timeout: 300
+
+# Monitoring and health checks
+monitoring:
+  health_checks:
+    - name: "package_import"
+      command: ["python", "-c", "import quickhooks; print('OK')"]
+      interval: 30
+      timeout: 10
+      
+    - name: "cli_version"
+      command: ["quickhooks", "--version"]
+      interval: 60
+      timeout: 5
+  
+  metrics:
+    - name: "deployment_duration"
+      type: "duration"
+      
+    - name: "success_rate"
+      type: "percentage"
+      
+    - name: "artifact_size"
+      type: "bytes"
+
+# Security configuration
+security:
+  secret_scanning:
+    enabled: true
+    patterns:
+      - "password"
+      - "secret"
+      - "token"
+      - "key"
+  
+  dependency_scanning:
+    enabled: true
+    vulnerability_db: "safety"
+    
+  code_scanning:
+    enabled: true
+    tools: ["bandit", "semgrep"]
+
+# Caching configuration
+cache:
+  uv_cache:
+    enabled: true
+    path: ".uv-cache"
+    max_size: "1GB"
+    
+  pip_cache:
+    enabled: true
+    path: ".pip-cache"
+    max_size: "500MB"
+    
+  build_cache:
+    enabled: true
+    path: "build-cache"
+    max_age: "7d"
+
+# Advanced features
+advanced:
+  parallel_execution:
+    enabled: true
+    max_workers: 4
+    
+  resource_limits:
+    max_memory: "2GB"
+    max_cpu: "2"
+    
+  feature_flags:
+    experimental_validation: false
+    enhanced_security: true
+    performance_profiling: false

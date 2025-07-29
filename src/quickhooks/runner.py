@@ -7,9 +7,10 @@ parallel execution, filtering, timeouts, and multiple report formats.
 import asyncio
 import json
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from quickhooks.models import HookOutput
 
@@ -22,9 +23,9 @@ class TestResult:
         test_name: str,
         status: str,
         duration: float,
-        output: Optional[HookOutput] = None,
-        error: Optional[Exception] = None,
-        timestamp: Optional[datetime] = None,
+        output: HookOutput | None = None,
+        error: Exception | None = None,
+        timestamp: datetime | None = None,
     ):
         self.test_name = test_name
         self.status = status  # 'passed', 'failed', 'error', 'skipped'
@@ -33,7 +34,7 @@ class TestResult:
         self.error = error
         self.timestamp = timestamp or datetime.now()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert test result to dictionary for serialization."""
         return {
             "test_name": self.test_name,
@@ -62,9 +63,9 @@ class TestRunner:
         self.test_directory = Path(test_directory)
         self.timeout = timeout
         self.max_workers = max_workers
-        self.results: List[TestResult] = []
-        self.setup_hooks: List[Callable] = []
-        self.teardown_hooks: List[Callable] = []
+        self.results: list[TestResult] = []
+        self.setup_hooks: list[Callable] = []
+        self.teardown_hooks: list[Callable] = []
 
     def add_setup_hook(self, hook: Callable) -> None:
         """Add a setup hook to run before tests."""
@@ -74,7 +75,7 @@ class TestRunner:
         """Add a teardown hook to run after tests."""
         self.teardown_hooks.append(hook)
 
-    def discover_tests(self, pattern: str = "test_*.py") -> List[Path]:
+    def discover_tests(self, pattern: str = "test_*.py") -> list[Path]:
         """Discover test files matching the given pattern."""
         if not self.test_directory.exists():
             return []
@@ -82,7 +83,7 @@ class TestRunner:
         return list(self.test_directory.glob(pattern))
 
     async def run_test_case(
-        self, test_func: Callable, test_name: str, timeout: Optional[float] = None
+        self, test_func: Callable, test_name: str, timeout: float | None = None
     ) -> TestResult:
         """Run a single test case with timeout support."""
         start_time = time.time()
@@ -108,7 +109,7 @@ class TestRunner:
                 test_name=test_name, status="passed", duration=duration, output=result
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             duration = time.time() - start_time
             return TestResult(
                 test_name=test_name,
@@ -124,8 +125,8 @@ class TestRunner:
             )
 
     async def run_tests_sequentially(
-        self, test_cases: List[tuple], filter_pattern: Optional[str] = None
-    ) -> List[TestResult]:
+        self, test_cases: list[tuple], filter_pattern: str | None = None
+    ) -> list[TestResult]:
         """Run test cases sequentially."""
         results = []
 
@@ -141,8 +142,8 @@ class TestRunner:
         return results
 
     async def run_tests_in_parallel(
-        self, test_cases: List[tuple], filter_pattern: Optional[str] = None
-    ) -> List[TestResult]:
+        self, test_cases: list[tuple], filter_pattern: str | None = None
+    ) -> list[TestResult]:
         """Run test cases in parallel."""
         # Filter test cases if pattern provided
         if filter_pattern:
@@ -173,7 +174,7 @@ class TestRunner:
 
         return processed_results
 
-    def load_test_cases_from_file(self, file_path: Path) -> List[tuple]:
+    def load_test_cases_from_file(self, file_path: Path) -> list[tuple]:
         """Load test cases from a test file."""
         # This is a simplified implementation
         # In a real implementation, we would dynamically import and inspect the file
@@ -183,8 +184,8 @@ class TestRunner:
         return test_cases
 
     async def run_all_tests(
-        self, parallel: bool = False, filter_pattern: Optional[str] = None
-    ) -> List[TestResult]:
+        self, parallel: bool = False, filter_pattern: str | None = None
+    ) -> list[TestResult]:
         """Run all discovered tests."""
         test_files = self.discover_tests()
         all_results = []
@@ -201,7 +202,7 @@ class TestRunner:
 
         return all_results
 
-    def generate_text_report(self, results: List[TestResult]) -> str:
+    def generate_text_report(self, results: list[TestResult]) -> str:
         """Generate a text report of test results."""
         if not results:
             return "No tests found or executed."
@@ -238,7 +239,7 @@ Duration: {duration:.2f}s
 
         return report.strip()
 
-    def generate_json_report(self, results: List[TestResult]) -> str:
+    def generate_json_report(self, results: list[TestResult]) -> str:
         """Generate a JSON report of test results."""
         report_data = {
             "summary": {
@@ -254,7 +255,7 @@ Duration: {duration:.2f}s
 
         return json.dumps(report_data, indent=2)
 
-    def generate_junit_report(self, results: List[TestResult]) -> str:
+    def generate_junit_report(self, results: list[TestResult]) -> str:
         """Generate a JUnit XML report of test results."""
         # Simplified JUnit XML generation
         timestamp = datetime.now().isoformat()
@@ -300,7 +301,7 @@ Duration: {duration:.2f}s
     async def run(
         self,
         parallel: bool = False,
-        filter_pattern: Optional[str] = None,
+        filter_pattern: str | None = None,
         report_format: str = "text",
     ) -> str:
         """Run all tests and generate a report."""

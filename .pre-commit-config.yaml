@@ -1,0 +1,110 @@
+repos:
+  # Ruff for linting and formatting (replaces black, isort, flake8, etc.)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      # Run the linter
+      - id: ruff
+        name: ruff lint
+        args: [--fix]
+        types_or: [python, pyi, jupyter]
+      # Run the formatter
+      - id: ruff-format
+        name: ruff format
+        types_or: [python, pyi, jupyter]
+
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: mypy type check
+        additional_dependencies:
+          - types-all
+        exclude: ^(tests/|scripts/)
+        args: [--strict]
+
+  # General pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      # Check file formatting
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+      - id: end-of-file-fixer
+        name: fix end of files
+      - id: mixed-line-ending
+        name: mixed line ending
+        args: [--fix=lf]
+      
+      # Check file structure
+      - id: check-yaml
+        name: check yaml
+      - id: check-toml
+        name: check toml
+      - id: check-json
+        name: check json
+      - id: check-merge-conflict
+        name: check for merge conflicts
+      - id: check-case-conflict
+        name: check for case conflicts
+      
+      # Python-specific checks
+      - id: check-ast
+        name: check python ast
+      - id: check-docstring-first
+        name: check docstring is first
+      - id: debug-statements
+        name: debug statements (Python)
+      
+      # General file checks
+      - id: check-added-large-files
+        name: check for added large files
+        args: [--maxkb=1024]
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: bandit security check
+        args: ["-r", "src/"]
+        exclude: ^tests/
+
+  # Commit message formatting
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.13.0
+    hooks:
+      - id: commitizen
+        name: commitizen check
+        stages: [commit-msg]
+
+  # UV-specific checks
+  - repo: local
+    hooks:
+      # Ensure UV lock file is up to date
+      - id: uv-lock-check
+        name: UV lock file check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
+
+      # Run tests before commit (optional - can be slow)
+      - id: pytest-check
+        name: pytest check
+        entry: uv run pytest
+        language: system
+        args: ["-x", "--tb=short", "-q"]
+        files: \.(py)$
+        stages: [pre-push]  # Only run on push, not every commit
+
+# Global configuration
+default_language_version:
+  python: python3.12
+
+ci:
+  # Run pre-commit.ci on these events
+  autoupdate_schedule: weekly
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  skip: [pytest-check]  # Skip slow checks in CI

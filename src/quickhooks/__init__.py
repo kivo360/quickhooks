@@ -5,7 +5,6 @@ a focus on test-driven development and developer experience.
 """
 
 from pathlib import Path
-from typing import List, Optional, Union
 
 from rich.console import Console
 
@@ -13,16 +12,57 @@ from rich.console import Console
 __version__ = "0.1.0"
 
 # Export main components
+from .core import (
+    ParallelProcessor,
+    ProcessingMode,
+    ProcessingPriority,
+    ProcessingResult,
+    ProcessingTask,
+)
+from .exceptions import (
+    HookExecutionError,
+    ProcessingError,
+    QuickHooksError,
+    ValidationError,
+)
 from .executor import ExecutionError, ExecutionResult, HookExecutor, PreToolUseInput
+from .hooks import (
+    BaseHook,
+    DataParallelHook,
+    MultiHookProcessor,
+    ParallelHook,
+    PipelineHook,
+)
+from .visualization import MermaidWorkflowGenerator
 
 __all__ = [
     "__version__",
     "quickhooks_path",
     "hello",
+    # Core execution
     "ExecutionError",
-    "ExecutionResult", 
+    "ExecutionResult",
     "HookExecutor",
     "PreToolUseInput",
+    # Parallel processing
+    "ParallelProcessor",
+    "ProcessingTask",
+    "ProcessingResult",
+    "ProcessingMode",
+    "ProcessingPriority",
+    # Hook classes
+    "BaseHook",
+    "ParallelHook",
+    "MultiHookProcessor",
+    "DataParallelHook",
+    "PipelineHook",
+    # Visualization
+    "MermaidWorkflowGenerator",
+    # Exceptions
+    "QuickHooksError",
+    "HookExecutionError",
+    "ProcessingError",
+    "ValidationError",
 ]
 
 # Path to the package root
@@ -36,7 +76,7 @@ def print_banner() -> None:
     """Print the QuickHooks banner."""
     banner = """
     [38;5;39m╔═╗╦ ╦╦═╗╦ ╦╔═╗╦ ╦╔╗╔╔═╗╔╦╗╔═╗╦  ╔═╗
-    ╠╣ ║ ║╠╦╝║║║╠═╝╠═╣║║║╠╣  ║ ║ ║║  ╠╣ 
+    ╠╣ ║ ║╠╦╝║║║╠═╝╠═╣║║║╠╣  ║ ║ ║║  ╠╣
     ╚  ╚═╝╩╚═╚╩╝╩  ╩ ╩╝╚╝╚   ╩ ╚═╝╩  ╚  [0m
     """
     console.print(banner)

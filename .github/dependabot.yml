@@ -1,0 +1,76 @@
+version: 2
+updates:
+  # Enable version updates for Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "kivo360"
+    assignees:
+      - "kivo360"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    # Group updates by type
+    groups:
+      development-dependencies:
+        patterns:
+          - "pytest*"
+          - "mypy*"
+          - "ruff*"
+          - "black*"
+          - "pre-commit*"
+          - "safety*"
+          - "bandit*"
+          - "twine*"
+          - "build*"
+      production-dependencies:
+        patterns:
+          - "typer*"
+          - "pydantic*"
+          - "watchfiles*"
+          - "rich*"
+          - "jsonschema*"
+          - "groq*"
+          - "pydantic-ai*"
+          - "chromadb*"
+          - "sentence-transformers*"
+    # Ignore specific versions or dependencies if needed
+    ignore:
+      # Ignore major version updates for stable dependencies
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typer"
+        update-types: ["version-update:semver-major"]
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "kivo360"
+    assignees:
+      - "kivo360"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

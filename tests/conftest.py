@@ -1,8 +1,8 @@
 """Test configuration and fixtures for QuickHooks."""
 
 import asyncio
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 from typer.testing import CliRunner
@@ -14,7 +14,7 @@ from quickhooks.cli.main import app
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """Create an instance of the default event loop for the test session.
-    
+
     This is needed for async tests.
     """
     loop = asyncio.get_event_loop_policy().new_event_loop()

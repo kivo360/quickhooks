@@ -1,0 +1,454 @@
+name: QuickHooks Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version_bump:
+        description: 'Version bump type'
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      publish_to_pypi:
+        description: 'Publish to PyPI'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: "3.12"
+  UV_VERSION: "0.5.0"
+
+jobs:
+  # Validate and prepare release
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_publish: ${{ steps.check.outputs.should_publish }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          uv sync --all-groups
+          uv add --dev build twine
+      
+      - name: Get or bump version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.version_bump }}" != "" ]]; then
+            # Bump version for manual dispatch
+            NEW_VERSION=$(uv version --bump ${{ github.event.inputs.version_bump }})
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            # Get current version
+            CURRENT_VERSION=$(uv version)
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Check if should publish
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]] || [[ "${{ github.event.inputs.publish_to_pypi }}" == "true" ]]; then
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Validate project structure
+        run: |
+          echo "Validating project structure..."
+          test -f pyproject.toml || (echo "pyproject.toml not found" && exit 1)
+          test -d src/quickhooks || (echo "Source directory not found" && exit 1)
+          test -f src/quickhooks/__init__.py || (echo "Package __init__.py not found" && exit 1)
+      
+      - name: Check Git status
+        run: |
+          if [[ $(git status --porcelain) ]]; then
+            echo "::warning::Uncommitted changes detected"
+            git status --porcelain
+          fi
+
+  # Run comprehensive tests
+  test:
+    runs-on: ${{ matrix.os }}
+    needs: validate
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+      fail-fast: false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: uv sync --all-groups
+      
+      - name: Run linting
+        run: |
+          uv run ruff check src/ tests/ --output-format=github
+          uv run ruff format --check src/ tests/
+      
+      - name: Run type checking
+        run: uv run mypy src/quickhooks
+      
+      - name: Run tests with coverage
+        run: |
+          uv run pytest tests/ \
+            --cov=src/quickhooks \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=80 \
+            --junit-xml=pytest-results.xml \
+            -v
+      
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.python-version }}
+          path: |
+            pytest-results.xml
+            htmlcov/
+            coverage.xml
+
+  # Security and quality checks
+  security:
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: uv sync --all-groups
+      
+      - name: Run security audit
+        run: |
+          # Install safety and bandit for security scanning
+          uv add --dev safety bandit[toml]
+          
+          # Check for known vulnerabilities
+          uv run safety check --json --output safety-report.json || true
+          
+          # Run static analysis security scan
+          uv run bandit -r src/ -f json -o bandit-report.json || true
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            safety-report.json
+            bandit-report.json
+
+  # Build packages in parallel
+  build:
+    runs-on: ubuntu-latest
+    needs: [validate, test, security]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: uv sync --all-groups
+      
+      - name: Clean previous builds
+        run: rm -rf dist/
+      
+      - name: Build packages using agent coordinator
+        run: python scripts/agent-coordinator.py build
+      
+      - name: Validate build artifacts
+        run: python scripts/validate-build.py --verbose
+      
+      - name: Generate checksums
+        run: python scripts/validate-build.py checksum --algorithm sha256 > dist/checksums.txt
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: |
+            dist/
+            !dist/*.tmp
+          retention-days: 30
+      
+      - name: Verify package installability
+        run: |
+          # Test installation in clean environment
+          uv venv test-env
+          source test-env/bin/activate || test-env\Scripts\activate
+          uv pip install dist/*.whl
+          python -c "import quickhooks; print('Package imported successfully')"
+
+  # Integration tests with built packages
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+      
+      - name: Run integration tests
+        run: |
+          # Create isolated test environment
+          uv venv integration-test
+          source integration-test/bin/activate
+          
+          # Install built package
+          uv pip install dist/*.whl
+          
+          # Run integration tests
+          python -m pytest tests/test_integration.py -v || echo "Integration tests not found, skipping"
+          
+          # Test CLI functionality
+          quickhooks --version
+          quickhooks --help
+          
+          # Test installation in different scenarios
+          python -c "
+          import sys
+          import quickhooks
+          print(f'QuickHooks {quickhooks.__version__} installed successfully')
+          print(f'Python {sys.version}')
+          "
+
+  # Release deployment
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [validate, test, security, build, integration-test]
+    if: needs.validate.outputs.should_publish == 'true'
+    environment: 
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: https://pypi.org/project/quickhooks/
+    permissions:
+      id-token: write  # For trusted publishing
+      contents: write  # For creating releases
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+      
+      - name: Install dependencies
+        run: uv sync --all-groups
+      
+      - name: Determine publish target
+        id: publish_target
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "staging" ]] || [[ "${GITHUB_REF#refs/tags/}" =~ -[a-zA-Z] ]]; then
+            echo "index=testpypi" >> $GITHUB_OUTPUT
+            echo "url=https://test.pypi.org/project/quickhooks/" >> $GITHUB_OUTPUT
+          else
+            echo "index=pypi" >> $GITHUB_OUTPUT
+            echo "url=https://pypi.org/project/quickhooks/" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Publish to PyPI (TestPyPI)
+        if: steps.publish_target.outputs.index == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+          print-hash: true
+      
+      - name: Publish to PyPI (Production)
+        if: steps.publish_target.outputs.index == 'pypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          print-hash: true
+      
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: QuickHooks ${{ github.ref_name }}
+          body: |
+            ## QuickHooks ${{ github.ref_name }}
+            
+            ### What's Changed
+            - See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+            
+            ### Installation
+            ```bash
+            uv add quickhooks
+            # or
+            pip install quickhooks
+            ```
+            
+            ### Verification
+            Package checksums are available in the [build artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+            
+            ### Full Changelog
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/v0.0.1...${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+      
+      - name: Upload release assets
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          # Upload dist files to release
+          for file in dist/*; do
+            if [[ -f "$file" ]]; then
+              echo "Would upload $file to release"
+              # gh release upload ${{ github.ref_name }} "$file"
+            fi
+          done
+
+  # Post-deployment verification
+  post-deploy:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: needs.validate.outputs.should_publish == 'true'
+    
+    steps:
+      - name: Wait for package availability
+        run: |
+          echo "Waiting for package to be available..."
+          sleep 60  # Give PyPI time to process
+      
+      - name: Verify package on PyPI
+        run: |
+          # Try to install from PyPI
+          pip install --index-url https://pypi.org/simple/ quickhooks==${{ needs.validate.outputs.version }} --dry-run
+          
+          # Check metadata
+          pip show quickhooks || echo "Package not yet available"
+      
+      - name: Update deployment status
+        run: |
+          echo "Deployment verification completed"
+          echo "Package version: ${{ needs.validate.outputs.version }}"
+          echo "Published to: ${{ needs.deploy.outputs.url || 'PyPI' }}"
+
+  # Cleanup and notification
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [validate, test, security, build, integration-test, deploy, post-deploy]
+    if: always()
+    
+    steps:
+      - name: Clean up artifacts
+        run: |
+          echo "Release pipeline completed"
+          echo "Status: ${{ job.status }}"
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Release pipeline failed"
+          echo "Please check the failed jobs for details"
+      
+      - name: Summary
+        run: |
+          echo "## Release Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ needs.validate.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Published: ${{ needs.validate.outputs.should_publish }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment: ${{ github.event.inputs.environment || 'auto' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY

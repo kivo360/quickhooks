@@ -1,6 +1,7 @@
 """Tests for the development server functionality."""
 
 import asyncio
+import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -95,10 +96,8 @@ async def test_run_dev_server():
     # Cancel the server
     server_task.cancel()
 
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await server_task
-    except asyncio.CancelledError:
-        pass
 
     # Verify the target was called
     mock_target.assert_awaited_once()

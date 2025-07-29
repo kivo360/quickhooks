@@ -7,10 +7,12 @@ It's designed to be used during development for a smooth workflow.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import signal
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Awaitable, Callable, List, Optional, TypeVar, Union
+from typing import TypeVar
 
 import typer
 from rich.console import Console
@@ -38,10 +40,10 @@ class DevServer:
 
     def __init__(
         self,
-        watch_paths: List[Union[str, Path]],
+        watch_paths: list[str | Path],
         target: Callable[[], Awaitable[None]],
         reload_delay: float = 0.5,
-        startup_messages: Optional[List[str]] = None,
+        startup_messages: list[str] | None = None,
     ) -> None:
         """Initialize the development server.
 
@@ -56,7 +58,7 @@ class DevServer:
         self.reload_delay = reload_delay
         self.startup_messages = startup_messages or []
         self.console = Console()
-        self._current_task: Optional[asyncio.Task[None]] = None
+        self._current_task: asyncio.Task[None] | None = None
         self._should_reload = asyncio.Event()
         self._stop_event = asyncio.Event()
 
@@ -79,10 +81,8 @@ class DevServer:
                 # Cancel the current task if it's running
                 if self._current_task and not self._current_task.done():
                     self._current_task.cancel()
-                    try:
+                    with contextlib.suppress(asyncio.CancelledError):
                         await self._current_task
-                    except asyncio.CancelledError:
-                        pass
 
                 # Add a small delay to ensure files are fully written
                 await asyncio.sleep(self.reload_delay)
@@ -95,10 +95,8 @@ class DevServer:
             # Clean up on keyboard interrupt
             if self._current_task and not self._current_task.done():
                 self._current_task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await self._current_task
-                except asyncio.CancelledError:
-                    pass
 
             self.console.print("\n[green]Development server stopped[/green]")
 
@@ -170,9 +168,9 @@ class DevServer:
 
 async def run_dev_server(
     target: Callable[[], Awaitable[None]],
-    watch_paths: Optional[List[Union[str, Path]]] = None,
+    watch_paths: list[str | Path] | None = None,
     reload_delay: float = 0.5,
-    startup_messages: Optional[List[str]] = None,
+    startup_messages: list[str] | None = None,
 ) -> None:
     """Run a development server with hot-reload.
 
@@ -225,7 +223,7 @@ def dev_cli() -> None:
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
             ) as progress:
-                task = progress.add_task("Running development server...", total=None)
+                progress.add_task("Running development server...", total=None)
                 console.print("\n[green]Development server started![/green]")
                 console.print("  - Press Ctrl+C to stop")
                 console.print(f"  - Watching: {watch_path}")
@@ -247,7 +245,7 @@ def dev_cli() -> None:
             "[yellow]Press Ctrl+C to stop[/yellow]",
         ]
 
-        try:
+        with contextlib.suppress(KeyboardInterrupt):
             asyncio.run(
                 run_dev_server(
                     target=target,
@@ -256,8 +254,6 @@ def dev_cli() -> None:
                     startup_messages=startup_messages,
                 )
             )
-        except KeyboardInterrupt:
-            pass
 
     app()
 

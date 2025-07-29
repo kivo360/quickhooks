@@ -1,6 +1,6 @@
 [project]
 name = "quickhooks"
-version = "0.1.0"
+version = "0.1.1"
 description = "A streamlined TDD framework for Claude Code hooks with real-time feedback"
 readme = "README.md"
 authors = [
@@ -12,8 +12,8 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Typing :: Typed",
 ]
 dependencies = [
@@ -26,6 +26,8 @@ dependencies = [
     "pydantic-ai-slim[groq]>=0.0.49", # Pydantic AI with Groq support
     "chromadb>=0.4.0", # Vector database for agent discovery
     "sentence-transformers>=2.2.0", # For text embeddings
+    "mermaid-py>=0.8.0",
+    "pydantic-settings>=2.10.1",
 ]
 
 [project.optional-dependencies]
@@ -45,8 +47,8 @@ quickhooks = "quickhooks.cli:app"
 quickhooks-dev = "quickhooks.dev:main"  # Development server with hot reload
 
 [build-system]
-requires = ["uv_build>=0.8.3,<0.9.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.uv]
 dev-dependencies = [
@@ -58,4 +60,113 @@ dev-dependencies = [
     "ruff>=0.1.9",
     "pre-commit>=3.0.0",
     "rich>=13.7.0",
+    "build>=0.10.0",
+    "twine>=4.0.0",
+]
+
+[tool.uv.sources]
+# Pin to specific versions for reproducible builds
+
+# Ruff configuration
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+    "TC",  # flake8-type-checking (updated from TCH)
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+    "B905",  # zip strict parameter
+    "TC003", # Move import into type-checking block (updated from TCH003)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["quickhooks"]
+force-single-line = false
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=quickhooks",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--cov-report=html",
+    "--cov-fail-under=80",
+]
+testpaths = ["tests"]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "tests/*",
+    "*/test_*.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
 ]

@@ -1,6 +1,7 @@
 """Test cases for the example hook."""
 
 import pytest
+
 from quickhooks.models import HookInput, HookOutput
 
 

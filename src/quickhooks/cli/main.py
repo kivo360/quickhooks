@@ -8,16 +8,15 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 
 from quickhooks import __version__, console
+from quickhooks.agent_analysis.command import app as agent_analysis_app
+from quickhooks.cli.install import install_app
 from quickhooks.hooks.base import BaseHook
 from quickhooks.models import HookInput
 from quickhooks.runner import TestRunner
-from quickhooks.cli.install import install_app
-from quickhooks.agent_analysis.command import app as agent_analysis_app
 
 # Create the main Typer app
 app = typer.Typer(
@@ -40,7 +39,7 @@ def version() -> None:
 
 
 @app.command()
-def hello(name: Optional[str] = None) -> None:
+def hello(name: str | None = None) -> None:
     """Say hello.
 
     Args:
@@ -115,7 +114,7 @@ def test(
     tests_directory: Path = typer.Option(
         "./tests", "--tests-dir", "-t", help="Directory containing test files"
     ),
-    pattern: Optional[str] = typer.Option(
+    pattern: str | None = typer.Option(
         None, "--pattern", "-p", help="Pattern to filter test files by name"
     ),
     parallel: bool = typer.Option(
