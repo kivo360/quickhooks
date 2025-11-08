@@ -1,10 +1,12 @@
-"""Agent analysis using Pydantic AI and Groq."""
+"""Agent analysis using Pydantic AI and Fireworks AI."""
 
 import os
 
 from pydantic_ai import Agent
-from pydantic_ai.models.groq import GroqModel
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.fireworks import FireworksProvider
 
+from ..config import get_config
 from .agent_discovery import AgentDiscovery
 from .context_manager import ContextManager
 from .types import (
@@ -16,35 +18,51 @@ from .types import (
 
 
 class AgentAnalyzer:
-    """Analyzes prompts to determine appropriate agent usage with Pydantic AI and Groq."""
+    """Analyzes prompts to determine appropriate agent usage with Pydantic AI and Fireworks AI."""
 
     def __init__(
         self,
-        groq_api_key: str | None = None,
-        model_name: str = "llama-3.3-70b-versatile",
+        api_key: str | None = None,
+        model_name: str | None = None,
+        base_url: str | None = None,
         enable_agent_discovery: bool = True,
     ):
         """
         Initialize the agent analyzer.
 
         Args:
-            groq_api_key: Groq API key (uses GROQ_API_KEY env var if not provided)
-            model_name: Groq model to use for analysis
+            api_key: Fireworks API key (uses FIREWORKS_API_KEY env var if not provided)
+            model_name: Fireworks model to use for analysis (uses FIREWORKS_LLM env var if not provided)
+            base_url: Fireworks API base URL (uses config default if not provided)
             enable_agent_discovery: Whether to enable discovery of local agents
         """
-        api_key = groq_api_key or os.getenv("GROQ_API_KEY")
+        # Get configuration
+        config = get_config()
+
+        # Use provided values or fall back to config/env
+        api_key = api_key or config.ai.api_key or os.getenv("FIREWORKS_API_KEY")
         if not api_key:
             raise ValueError(
-                "GROQ_API_KEY environment variable must be set or groq_api_key must be provided"
+                "FIREWORKS_API_KEY environment variable must be set or api_key must be provided"
             )
 
-        self.model = GroqModel(model_name)
+        model_name = model_name or config.ai.llm
+
+        # Create Fireworks provider with the API key
+        # pydantic-ai has built-in Fireworks support via FireworksProvider
+        fireworks_provider = FireworksProvider(api_key=api_key)
+
+        # Create OpenAI-compatible model with the Fireworks provider
+        self.model = OpenAIModel(
+            model_name,
+            provider=fireworks_provider,
+        )
         self.context_manager = ContextManager()
 
         # Initialize agent discovery if enabled
         self.agent_discovery = AgentDiscovery() if enable_agent_discovery else None
 
-        # Create the Pydantic AI agent for analysis
+        # Create the Pydantic AI agent for analysis with tool calls enabled
         self.agent = Agent(
             self.model,
             output_type=AgentAnalysisResponse,

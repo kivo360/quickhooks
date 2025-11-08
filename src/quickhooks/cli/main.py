@@ -20,6 +20,7 @@ from quickhooks.cli.global_hooks import global_app
 from quickhooks.cli.features import app as features_app
 from quickhooks.cli.smart import smart_app
 from quickhooks.cli.deploy import deploy_app
+from quickhooks.cli.settings import app as settings_app
 from quickhooks.features import has_feature
 from quickhooks.hooks.base import BaseHook
 from quickhooks.models import HookInput
@@ -55,6 +56,9 @@ app.add_typer(agent_analysis_app, name="agents")
 
 # Add Agent OS subcommands
 app.add_typer(agent_os_app, name="agent-os")
+
+# Add settings management subcommands
+app.add_typer(settings_app, name="settings")
 
 
 @app.command()

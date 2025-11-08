@@ -140,6 +140,42 @@ class DevelopmentConfig(BaseSettings):
     )
 
 
+class AIConfig(BaseSettings):
+    """AI and agent configuration settings.
+
+    Configures AI provider, models, and agent behavior for QuickHooks.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="FIREWORKS_", case_sensitive=False
+    )
+
+    api_key: str | None = Field(
+        default=None, description="Fireworks AI API key"
+    )
+    llm: str = Field(
+        default="accounts/fireworks/models/glm-4p6",
+        description="Fireworks LLM model for text generation and tool calls",
+    )
+    vlm: str = Field(
+        default="accounts/fireworks/models/qwen3-vl-235b-a22b-instruct",
+        description="Fireworks VLM model for vision tasks",
+    )
+    base_url: str = Field(
+        default="https://api.fireworks.ai/inference/v1",
+        description="Fireworks API base URL",
+    )
+    enable_tool_calls: bool = Field(
+        default=True, description="Enable tool calls by default for structured outputs"
+    )
+    temperature: float = Field(
+        default=0.7, ge=0.0, le=2.0, description="Temperature for model responses"
+    )
+    max_retries: int = Field(
+        default=3, ge=0, description="Maximum retries for failed API calls"
+    )
+
+
 class QuickHooksConfig(BaseSettings):
     """Main configuration class for QuickHooks framework.
 
@@ -181,6 +217,9 @@ class QuickHooksConfig(BaseSettings):
     development: DevelopmentConfig = Field(
         default_factory=DevelopmentConfig,
         description="Development and debugging configuration",
+    )
+    ai: AIConfig = Field(
+        default_factory=AIConfig, description="AI and agent configuration"
     )
 
     @field_validator("secret_key")
