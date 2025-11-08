@@ -9,7 +9,7 @@ from pathlib import Path
 from rich.console import Console
 
 # Version of quickhooks
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 # Export main components
 from .core import (

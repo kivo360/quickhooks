@@ -151,9 +151,10 @@ class DeploymentOrchestrator:
         raise ValueError("Version not found in pyproject.toml")
 
     def bump_version(self, bump_type: VersionBump) -> str:
-        """Bump version using UV version command."""
+        """Bump version using bump_version.py script."""
         try:
-            cmd = ["uv", "version", "--bump", bump_type.value]
+            bump_script = self.config.project_root / "scripts" / "bump_version.py"
+            cmd = ["uv", "run", "python", str(bump_script), "bump", bump_type.value]
             result = subprocess.run(
                 cmd,
                 cwd=self.config.project_root,
@@ -162,18 +163,12 @@ class DeploymentOrchestrator:
                 check=True,
             )
 
-            # Extract new version from output
-            output_lines = result.stdout.strip().split("\n")
-            for line in output_lines:
-                if "=>" in line:
-                    new_version = line.split("=>")[1].strip()
-                    return new_version
-
-            # Fallback: get version from pyproject.toml
-            return self.get_version_from_pyproject()
+            # The script outputs the new version as the last line
+            new_version = result.stdout.strip().split("\n")[-1]
+            return new_version
 
         except subprocess.CalledProcessError as e:
-            self.console.print(f"[red]Version bump failed: {e}")
+            self.console.print(f"[red]Version bump failed: {e.stderr}")
             raise
 
     def validate_environment(self) -> bool:
