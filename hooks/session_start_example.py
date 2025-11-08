@@ -39,6 +39,20 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Add QuickHooks to path if needed
+try:
+    from quickhooks.schema.hook_env import ClaudeCodeHookEnv, load_hook_env
+except ImportError:
+    # Try to add QuickHooks to path
+    quickhooks_path = Path.home() / ".quickhooks" / "src"
+    if quickhooks_path.exists():
+        sys.path.insert(0, str(quickhooks_path))
+        from quickhooks.schema.hook_env import ClaudeCodeHookEnv, load_hook_env
+    else:
+        # Fallback if QuickHooks not available
+        ClaudeCodeHookEnv = None
+        load_hook_env = None
+
 
 def load_project_context(cwd: str) -> dict:
     """
@@ -117,6 +131,30 @@ def main():
         # Load project context
         project_context = load_project_context(cwd)
 
+        # Load environment variables using Pydantic Settings
+        env = load_hook_env() if load_hook_env else None
+
+        # Write environment variables to CLAUDE_ENV_FILE (SessionStart only)
+        if env and env.is_session_start:
+            # Example: Set project-specific environment variables
+            project_env_vars = {}
+
+            # Set NODE_ENV for Node.js projects
+            if project_context.get("project_type") == "Node.js":
+                project_env_vars["NODE_ENV"] = "development"
+                # Add node_modules/.bin to PATH
+                project_env_vars["PATH"] = f"$PATH:{cwd}/node_modules/.bin"
+
+            # Set PYTHONPATH for Python projects
+            if project_context.get("project_type") == "Python":
+                project_env_vars["PYTHONPATH"] = f"$PYTHONPATH:{cwd}/src:{cwd}"
+
+            # Write to env file if we have vars to export
+            if project_env_vars:
+                success = env.write_env_file(project_env_vars)
+                if success:
+                    print(f"[SessionStart Hook] Exported {len(project_env_vars)} environment variables", file=sys.stderr)
+
         # Build context message for Claude
         context_parts = [
             f"# Session Started: {get_session_info(source)}",
@@ -137,9 +175,9 @@ def main():
             context_parts.append(f"README available at: {project_context['readme_path']}")
 
         # Check for CLAUDE_ENV_FILE (exclusive to SessionStart)
-        env_file = os.getenv("CLAUDE_ENV_FILE")
-        if env_file:
-            context_parts.append(f"Environment file: {env_file}")
+        if env and env.claude_env_file:
+            context_parts.append(f"Environment file: {env.claude_env_file}")
+            context_parts.append(f"Environment variables configured: {env.is_session_start}")
 
         context_parts.extend([
             "",
