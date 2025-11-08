@@ -14,6 +14,7 @@ import typer
 from quickhooks import __version__, console
 from quickhooks.agent_analysis.command import app as agent_analysis_app
 from quickhooks.cli.install import install_app
+from quickhooks.cli.settings import app as settings_app
 from quickhooks.hooks.base import BaseHook
 from quickhooks.models import HookInput
 from quickhooks.runner import TestRunner
@@ -30,6 +31,9 @@ app.add_typer(install_app, name="install")
 
 # Add agent analysis subcommands
 app.add_typer(agent_analysis_app, name="agents")
+
+# Add settings management subcommands
+app.add_typer(settings_app, name="settings")
 
 
 @app.command()
