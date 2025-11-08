@@ -4,6 +4,7 @@ import os
 
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.fireworks import FireworksProvider
 
 from ..config import get_config
 from .agent_discovery import AgentDiscovery
@@ -47,14 +48,14 @@ class AgentAnalyzer:
 
         model_name = model_name or config.ai.llm
 
-        # Create OpenAI-compatible model for Fireworks AI
-        # pydantic-ai has built-in Fireworks support
-        # Set the API key as an environment variable for the provider
-        os.environ["FIREWORKS_API_KEY"] = api_key
+        # Create Fireworks provider with the API key
+        # pydantic-ai has built-in Fireworks support via FireworksProvider
+        fireworks_provider = FireworksProvider(api_key=api_key)
 
+        # Create OpenAI-compatible model with the Fireworks provider
         self.model = OpenAIModel(
             model_name,
-            provider='fireworks',
+            provider=fireworks_provider,
         )
         self.context_manager = ContextManager()
 
