@@ -109,6 +109,18 @@
           "items": {
             "$ref": "#/$defs/hookMatcher"
           }
+        },
+        "SessionStart": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
+        },
+        "SessionEnd": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/hookMatcher"
+          }
         }
       }
     },

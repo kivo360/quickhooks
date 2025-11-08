@@ -90,6 +90,8 @@ class ClaudeSettingsValidator:
             "Stop",
             "SubagentStop",
             "PreCompact",
+            "SessionStart",
+            "SessionEnd",
         ]:
             raise ValueError(f"Invalid hook type: {hook_type}")
 

@@ -120,6 +120,63 @@ class UserPromptSubmitResponse(HookResponse):
         populate_by_name = True
 
 
+class SessionStartInput(BaseModel):
+    """Model for SessionStart hook input."""
+
+    session_id: str = Field(..., description="Unique session identifier")
+    transcript_path: str = Field(..., description="Path to conversation transcript")
+    cwd: str = Field(..., description="Current working directory")
+    hook_event_name: str = Field(..., description="Name of the hook event")
+    source: Literal["new", "resume", "restore"] | None = Field(
+        None, description="How the session was started"
+    )
+
+    class Config:
+        extra = "allow"
+
+
+class SessionStartResponse(HookResponse):
+    """Extended response model for SessionStart hooks.
+
+    SessionStart hooks inject context via stdout that is added to Claude's context.
+    Stdout from this hook is added as context for Claude.
+    """
+
+    additional_context: str | None = Field(
+        None,
+        alias="additionalContext",
+        description="Additional context to inject at session start",
+    )
+
+    class Config:
+        extra = "allow"
+        populate_by_name = True
+
+
+class SessionEndInput(BaseModel):
+    """Model for SessionEnd hook input."""
+
+    session_id: str = Field(..., description="Unique session identifier")
+    transcript_path: str = Field(..., description="Path to conversation transcript")
+    cwd: str = Field(..., description="Current working directory")
+    hook_event_name: str = Field(..., description="Name of the hook event")
+
+    class Config:
+        extra = "allow"
+
+
+class SessionEndResponse(HookResponse):
+    """Extended response model for SessionEnd hooks.
+
+    SessionEnd hooks are logged to debug only (--debug flag).
+    Use this for cleanup, logging, and session wrap-up tasks.
+    """
+
+    class Config:
+        extra = "allow"
+        populate_by_name = True
+
+
 class ClaudeSettings(BaseModel):
     """Model for Claude Code settings.json file."""
 
@@ -176,6 +233,8 @@ class ClaudeSettings(BaseModel):
             "Stop",
             "SubagentStop",
             "PreCompact",
+            "SessionStart",
+            "SessionEnd",
         }
 
         for hook_type in v:
