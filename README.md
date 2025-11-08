@@ -94,6 +94,37 @@ graph TD
 ```
 
 ### 🔗 Claude Code Integration Setup
+
+#### Option 1: PEP 723 Self-Contained Hooks (Recommended)
+
+Self-contained hooks with inline dependencies using [PEP 723](https://peps.python.org/pep-0723/):
+
+```bash
+# Install PEP 723 hooks to your project
+uv run -s scripts/setup_pep723_hooks.py install
+
+# Or copy to current directory manually
+cp -r .claude/ your-project/
+chmod +x your-project/.claude/hooks/*.py
+
+# Configure settings
+edit .claude/settings.json  # Set GROQ_API_KEY and enable hooks
+
+# Test hooks
+uv run -s scripts/setup_pep723_hooks.py test
+```
+
+**Benefits**:
+- ✅ Self-contained scripts with inline dependencies
+- ✅ No global installation required
+- ✅ Dependencies auto-install from PyPI via PEP 723
+- ✅ Fast execution with UV dependency caching
+- ✅ Portable across projects
+
+See **[PEP 723 Hooks Guide](PEP723_HOOKS_GUIDE.md)** for complete documentation.
+
+#### Option 2: Global Installation
+
 ```bash
 # Install globally for Claude Code integration
 uv run python -m quickhooks install install-global

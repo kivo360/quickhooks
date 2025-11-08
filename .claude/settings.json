@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "GROQ_API_KEY": "",
+    "QUICKHOOKS_AGENT_ANALYSIS_ENABLED": "true",
+    "QUICKHOOKS_AGENT_MODEL": "qwen/qwen3-32b",
+    "QUICKHOOKS_CONFIDENCE_THRESHOLD": "0.7",
+    "QUICKHOOKS_MIN_SIMILARITY": "0.3",
+    "QUICKHOOKS_VERBOSE": "false",
+    "QUICKHOOKS_CONTEXT_PORTAL_ENABLED": "true",
+    "QUICKHOOKS_CONTEXT_DB_PATH": "~/.quickhooks/context_db"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/example_hook_pep723.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/context_portal_hook_pep723.py"
+          }
+        ]
+      }
+    ]
+  },
+  "disableAllHooks": true,
+  "_quickhooks_metadata": {
+    "name": "QuickHooks PEP 723 Integration",
+    "description": "Self-contained Claude Code hooks using PEP 723 inline dependencies and UV",
+    "version": "0.1.1",
+    "available_hooks": {
+      "example_hook_pep723": {
+        "path": ".claude/hooks/example_hook_pep723.py",
+        "description": "Example hook demonstrating PEP 723 inline dependencies with QuickHooks",
+        "dependencies": [],
+        "recommended_events": ["UserPromptSubmit", "PostToolUse"]
+      },
+      "agent_analysis_hook_pep723": {
+        "path": ".claude/hooks/agent_analysis_hook_pep723.py",
+        "description": "Analyzes user prompts and discovers relevant agents automatically using QuickHooks AI analysis",
+        "dependencies": [
+          "quickhooks>=0.1.0",
+          "groq>=0.13.0",
+          "pydantic-ai-slim[groq]>=0.0.49",
+          "chromadb>=0.4.0",
+          "sentence-transformers>=2.2.0"
+        ],
+        "recommended_events": ["UserPromptSubmit"],
+        "requires_env": ["GROQ_API_KEY"]
+      },
+      "context_portal_hook_pep723": {
+        "path": ".claude/hooks/context_portal_hook_pep723.py",
+        "description": "Provides persistent memory and context management across sessions using QuickHooks",
+        "dependencies": ["quickhooks>=0.1.0"],
+        "recommended_events": ["SessionStart", "SessionEnd", "UserPromptSubmit"]
+      }
+    },
+    "pep723_info": {
+      "standard": "PEP 723",
+      "description": "Inline script metadata for self-contained Python scripts",
+      "benefits": [
+        "Self-contained: Each hook declares its own dependencies",
+        "No installation required: Dependencies installed automatically from PyPI",
+        "Fast execution: UV caches dependencies for instant runs",
+        "Portable: Scripts work anywhere UV is installed",
+        "Version controlled: Dependencies versioned within the script"
+      ],
+      "execution": "Hooks are directly executable with shebang #!/usr/bin/env -S uv run -s",
+      "documentation": "https://peps.python.org/pep-0723/"
+    },
+    "installation": {
+      "method": "pep723",
+      "instructions": [
+        "1. Install UV package manager:",
+        "   curl -LsSf https://astral.sh/uv/install.sh | sh",
+        "2. Set your Groq API key (for agent analysis):",
+        "   export GROQ_API_KEY=your_groq_api_key_here",
+        "3. Enable hooks by setting disableAllHooks: false and adding hooks to appropriate events",
+        "4. Dependencies are automatically installed from PyPI on first run via PEP 723",
+        "5. UV caches dependencies for instant subsequent executions"
+      ],
+      "quickstart": "Use 'quickhooks settings add-hook' command to easily add hooks"
+    },
+    "env_variables": {
+      "GROQ_API_KEY": {
+        "type": "string",
+        "required": false,
+        "description": "Groq API key for agent analysis (required only for agent-analysis-hook)"
+      },
+      "QUICKHOOKS_AGENT_ANALYSIS_ENABLED": {
+        "type": "boolean",
+        "default": "true",
+        "description": "Enable or disable automatic agent analysis"
+      },
+      "QUICKHOOKS_AGENT_MODEL": {
+        "type": "string",
+        "default": "qwen/qwen3-32b",
+        "description": "Groq model to use for agent analysis",
+        "options": ["qwen/qwen3-32b", "llama-3.3-70b-versatile", "mixtral-8x7b-32768"]
+      },
+      "QUICKHOOKS_CONFIDENCE_THRESHOLD": {
+        "type": "float",
+        "default": "0.7",
+        "range": [0.0, 1.0],
+        "description": "Minimum confidence threshold for agent recommendations"
+      },
+      "QUICKHOOKS_MIN_SIMILARITY": {
+        "type": "float",
+        "default": "0.3",
+        "range": [0.0, 1.0],
+        "description": "Minimum similarity score for discovered agents"
+      },
+      "QUICKHOOKS_VERBOSE": {
+        "type": "boolean",
+        "default": "false",
+        "description": "Enable verbose logging of hook execution"
+      },
+      "QUICKHOOKS_CONTEXT_PORTAL_ENABLED": {
+        "type": "boolean",
+        "default": "true",
+        "description": "Enable or disable context portal memory system"
+      },
+      "QUICKHOOKS_CONTEXT_DB_PATH": {
+        "type": "string",
+        "default": "~/.quickhooks/context_db",
+        "description": "Path to context database directory"
+      }
+    }
+  }
+}
