@@ -4,8 +4,10 @@ This module defines the configuration structure for the QuickHooks framework
 using Pydantic Settings for environment variable and file-based configuration.
 """
 
+import os
 import secrets
 from enum import Enum
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -274,3 +276,35 @@ def reload_config() -> QuickHooksConfig:
     global _config
     _config = QuickHooksConfig()
     return _config
+
+
+def get_global_hooks_dir() -> Path:
+    """Get the global hooks directory path.
+    
+    Returns:
+        Path: Path to the global hooks directory
+    """
+    # Check environment variable first
+    env_dir = os.getenv("QUICKHOOKS_GLOBAL_DIR")
+    if env_dir:
+        return Path(env_dir)
+    
+    # Default to user's home directory
+    home_dir = Path.home()
+    return home_dir / ".quickhooks" / "hooks"
+
+
+def get_global_config_dir() -> Path:
+    """Get the global configuration directory path.
+    
+    Returns:
+        Path: Path to the global configuration directory
+    """
+    # Check environment variable first
+    env_dir = os.getenv("QUICKHOOKS_GLOBAL_CONFIG_DIR")
+    if env_dir:
+        return Path(env_dir)
+    
+    # Default to user's home directory
+    home_dir = Path.home()
+    return home_dir / ".quickhooks" / "config"

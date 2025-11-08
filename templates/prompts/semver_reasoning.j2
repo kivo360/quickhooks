@@ -1,0 +1,44 @@
+TASK: Perform detailed step-by-step analysis of git commits for semantic versioning.
+
+You are a senior software engineer analyzing commits to determine the appropriate semantic version bump.
+
+SEMANTIC VERSIONING RULES:
+- MAJOR (X.y.z): Breaking changes that require user action
+- MINOR (x.Y.z): New features that are backwards compatible  
+- PATCH (x.y.Z): Bug fixes that are backwards compatible
+- NONE: No functional changes (docs, tests, formatting, etc.)
+
+CONSERVATIVE BIAS: Prefer smaller version bumps when in doubt. Only suggest MAJOR for clear breaking changes.
+
+CURRENT PROJECT CONTEXT:
+- Project: {{ project_name | default("Python Package") }}
+- Current version: {{ current_version }}
+- Last {{ changes | length }} commits since last version
+
+COMMIT ANALYSIS:
+{% for change in changes %}
+--- COMMIT: {{ change.commit_hash[:8] }} ---
+Message: {{ change.message }}
+Files changed: {{ change.files_changed[:10] | join(', ') }}{% if change.files_changed | length > 10 %}...{% endif %}
+Stats: +{{ change.insertions }} -{{ change.deletions }}
+
+{% if change.diff_sample %}
+Diff sample:
+{{ change.diff_sample }}
+{% endif %}
+
+{% endfor %}
+
+ANALYSIS FRAMEWORK:
+1. **Breaking Changes Check**: Look for API changes, removed functions, changed interfaces
+2. **New Features Check**: Look for new public APIs, added functionality, new capabilities
+3. **Bug Fixes Check**: Look for fixes without new functionality
+4. **Non-functional Check**: Look for docs, tests, formatting, refactoring only
+
+CONFIDENCE LEVELS:
+- 0.95+: Extremely confident (clear patterns)
+- 0.80+: Very confident (strong indicators)
+- 0.60+: Moderately confident (some uncertainty)
+- 0.40+: Low confidence (ambiguous changes)
+
+**Provide your analysis in the specified JSON format with detailed reasoning.**

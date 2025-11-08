@@ -1,0 +1,59 @@
+"""{{ description }}"""
+
+from quickhooks.hooks.base import BaseHook
+from quickhooks.models import HookInput, HookOutput
+
+
+class {{ class_name }}(BaseHook):
+    """{{ description }}"""
+    
+    name = "{{ hook_name }}"
+    description = "{{ description }}"
+    version = "{{ version | default('1.0.0') }}"
+    
+    def process(self, hook_input: HookInput) -> HookOutput:
+        """Process the hook input and return output."""
+        {% if hook_type == "validator" %}
+        # Validation logic
+        if not self._is_valid(hook_input):
+            return HookOutput(
+                allowed=False,
+                modified=False,
+                tool_name=hook_input.tool_name,
+                tool_input=hook_input.tool_input,
+                message="Validation failed"
+            )
+        {% elif hook_type == "transformer" %}
+        # Transformation logic
+        modified_input = self._transform_input(hook_input.tool_input)
+        
+        return HookOutput(
+            allowed=True,
+            modified=True,
+            tool_name=hook_input.tool_name,
+            tool_input=modified_input,
+            message="Input transformed successfully"
+        )
+        {% else %}
+        # Default processing logic
+        {% endif %}
+        
+        return HookOutput(
+            allowed=True,
+            modified=False,
+            tool_name=hook_input.tool_name,
+            tool_input=hook_input.tool_input,
+            message="Hook processed successfully"
+        )
+    
+    {% if hook_type == "validator" %}
+    def _is_valid(self, hook_input: HookInput) -> bool:
+        """Validate the hook input."""
+        # TODO: Implement validation logic
+        return True
+    {% elif hook_type == "transformer" %}
+    def _transform_input(self, tool_input: dict) -> dict:
+        """Transform the tool input."""
+        # TODO: Implement transformation logic
+        return tool_input.copy()
+    {% endif %}

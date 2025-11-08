@@ -1,0 +1,4 @@
+# Requirements for semver automation script
+groq>=0.13.0
+toml>=0.10.0
+pydantic>=2.5.0

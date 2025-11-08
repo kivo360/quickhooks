@@ -1,0 +1,74 @@
+"""{{ description }}"""
+
+import typer
+from typing import {{ type_imports | default(['Optional']) | join(', ') }}
+{% if additional_imports %}
+{% for import_line in additional_imports %}
+{{ import_line }}
+{% endfor %}
+{% endif %}
+
+app = typer.Typer(name="{{ command_name }}", help="{{ description }}")
+
+
+@app.command()
+def {{ main_command }}(
+    {% for param in parameters %}
+    {{ param.name }}: {{ param.type }} = typer.{{ param.typer_type }}(
+        {% if param.default is defined %}{{ param.default | repr }}, {% endif %}
+        help="{{ param.description | default('Parameter description.') }}"
+        {% if param.options %}, {{ param.options | join(', ') }}{% endif %}
+    ),
+    {% endfor %}
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+):
+    """{{ command_description | default(description) }}"""
+    {% if pre_execution_code %}
+    {{ pre_execution_code | indent(4) }}
+    {% endif %}
+    
+    if verbose:
+        typer.echo(f"Running {{ command_name }} with:")
+        {% for param in parameters %}
+        typer.echo(f"  {{ param.name }}: {{'{'}}{{ param.name }}{{'}'}}")
+        {% endfor %}
+    
+    try:
+        {% if main_logic %}
+        {{ main_logic | indent(8) }}
+        {% else %}
+        # TODO: Implement command logic
+        typer.echo("{{ command_name }} executed successfully!")
+        {% endif %}
+        
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        raise typer.Exit(1)
+
+
+{% for subcommand in subcommands | default([]) %}
+@app.command()
+def {{ subcommand.name }}(
+    {% for param in subcommand.parameters | default([]) %}
+    {{ param.name }}: {{ param.type }} = typer.{{ param.typer_type }}(
+        {% if param.default is defined %}{{ param.default | repr }}, {% endif %}
+        help="{{ param.description | default('Parameter description.') }}"
+    ),
+    {% endfor %}
+):
+    """{{ subcommand.description }}"""
+    {% if subcommand.logic %}
+    {{ subcommand.logic | indent(4) }}
+    {% else %}
+    # TODO: Implement {{ subcommand.name }} logic
+    typer.echo("{{ subcommand.name }} executed!")
+    {% endif %}
+
+
+{% endfor %}
+
+if __name__ == "__main__":
+    app()

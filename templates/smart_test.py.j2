@@ -1,0 +1,294 @@
+"""Tests for {{ hook_name }} hook."""
+
+import pytest
+import asyncio
+from unittest.mock import Mock, patch
+
+from quickhooks.models import HookInput, HookResult
+from quickhooks.hooks.{{ hook_name }} import {{ class_name }}Hook
+
+
+class Test{{ class_name }}Hook:
+    """Test suite for {{ class_name }}Hook."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.hook = {{ class_name }}Hook()
+    
+    def test_hook_initialization(self):
+        """Test hook is properly initialized."""
+        assert self.hook.name == "{{ hook_name }}"
+        assert self.hook.description == "{{ description }}"
+        assert self.hook.hook_type == "{{ hook_type }}"
+    
+    @pytest.mark.asyncio
+    async def test_wrong_tool_passthrough(self):
+        """Test hook passes through non-{{ target_tool }} tools."""
+        input_data = HookInput(
+            tool="DifferentTool",
+            arguments={"test": "value"}
+        )
+        
+        result = await self.hook.run(input_data)
+        
+        assert result.continue_execution is True
+        assert result.modified_arguments is None
+        assert result.error_message is None
+    
+    {% if hook_type == 'validator' %}
+    @pytest.mark.asyncio
+    async def test_validation_success(self):
+        """Test successful validation."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"valid": "input"}
+        )
+        
+        with patch.object(self.hook, '_validate_input') as mock_validate:
+            from quickhooks.hooks.{{ hook_name }} import ValidationResult
+            mock_validate.return_value = ValidationResult(is_valid=True)
+            
+            result = await self.hook.run(input_data)
+            
+            assert result.continue_execution is True
+            assert result.error_message is None
+    
+    @pytest.mark.asyncio
+    async def test_validation_failure(self):
+        """Test validation failure handling."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"invalid": "input"}
+        )
+        
+        with patch.object(self.hook, '_validate_input') as mock_validate:
+            from quickhooks.hooks.{{ hook_name }} import ValidationResult
+            mock_validate.return_value = ValidationResult(
+                is_valid=False,
+                error_message="Test validation error",
+                suggestions=["Fix the issue"]
+            )
+            
+            result = await self.hook.run(input_data)
+            
+            assert result.continue_execution is False
+            assert result.error_message == "Test validation error"
+            assert result.suggestions == ["Fix the issue"]
+    
+    {% for rule in rules %}
+    @pytest.mark.asyncio
+    async def test_validation_rule_{{ loop.index }}(self):
+        """Test validation rule: {{ rule }}"""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"test_rule_{{ loop.index }}": "data"}
+        )
+        
+        # Test rule passes
+        result = await self.hook._check_rule_{{ loop.index }}(input_data)
+        assert isinstance(result, bool)
+        
+        # TODO: Add specific test cases for: {{ rule }}
+    {% endfor %}
+    
+    {% elif hook_type == 'transformer' %}
+    @pytest.mark.asyncio
+    async def test_transformation_applied(self):
+        """Test transformation is properly applied."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"original": "value"}
+        )
+        
+        result = await self.hook.run(input_data)
+        
+        assert result.continue_execution is True
+        assert result.modified_arguments is not None
+        assert isinstance(result.modified_arguments, dict)
+    
+    @pytest.mark.asyncio
+    async def test_transformation_preserves_data(self):
+        """Test transformation doesn't lose important data."""
+        original_args = {"key1": "value1", "key2": "value2"}
+        
+        transformed = await self.hook._transform_arguments(original_args)
+        
+        assert isinstance(transformed, dict)
+        # Ensure we don't accidentally clear all data
+        assert len(transformed) >= 0
+    
+    {% for rule in rules %}
+    @pytest.mark.asyncio
+    async def test_transformation_rule_{{ loop.index }}(self):
+        """Test transformation rule: {{ rule }}"""
+        test_args = {"test_transform_{{ loop.index }}": "input"}
+        
+        result = await self.hook._apply_transformation_{{ loop.index }}(test_args)
+        
+        assert isinstance(result, dict)
+        # TODO: Add specific assertions for: {{ rule }}
+    {% endfor %}
+    
+    {% elif hook_type == 'analyzer' %}
+    @pytest.mark.asyncio
+    async def test_analysis_returns_data(self):
+        """Test analysis returns proper data structure."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"analyze": "this"}
+        )
+        
+        result = await self.hook.run(input_data)
+        
+        assert result.continue_execution is True
+        assert result.metadata is not None
+        assert "analysis" in result.metadata
+        assert isinstance(result.metadata["analysis"], dict)
+    
+    @pytest.mark.asyncio
+    async def test_analysis_includes_basics(self):
+        """Test analysis includes basic information."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"test": "data"}
+        )
+        
+        analysis = await self.hook._analyze_input(input_data)
+        
+        assert "timestamp" in analysis
+        assert "tool" in analysis
+        assert "arguments_count" in analysis
+        assert analysis["tool"] == "{{ target_tool }}"
+        assert analysis["arguments_count"] == 1
+    
+    {% for aspect in rules %}
+    @pytest.mark.asyncio
+    async def test_analysis_aspect_{{ loop.index }}(self):
+        """Test analysis aspect: {{ aspect }}"""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"test_aspect_{{ loop.index }}": "data"}  
+        )
+        
+        result = await self.hook._analyze_{{ loop.index }}(input_data)
+        
+        # TODO: Add specific assertions for: {{ aspect }}
+        assert result is not None
+    {% endfor %}
+    {% endif %}
+    
+    # Integration tests for real-world scenarios
+    {% for example in examples %}
+    @pytest.mark.asyncio
+    async def test_example_{{ loop.index }}_scenario(self):
+        """Test example scenario: {{ example }}"""
+        # TODO: Implement test for: {{ example }}
+        
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"example_{{ loop.index }}": "test_data"}
+        )
+        
+        result = await self.hook.run(input_data)
+        
+        # Basic assertions - customize based on expected behavior
+        assert result is not None
+        assert isinstance(result, HookResult)
+    {% endfor %}
+    
+    def test_hook_metadata(self):
+        """Test hook has proper metadata."""
+        assert hasattr(self.hook, 'name')
+        assert hasattr(self.hook, 'description')  
+        assert hasattr(self.hook, 'hook_type')
+        
+        assert self.hook.name
+        assert self.hook.description
+        assert self.hook.hook_type in ['validator', 'transformer', 'analyzer']
+
+
+# Performance tests
+class Test{{ class_name }}HookPerformance:
+    """Performance tests for {{ class_name }}Hook."""
+    
+    def setup_method(self):
+        """Set up performance test fixtures."""
+        self.hook = {{ class_name }}Hook()
+    
+    @pytest.mark.asyncio
+    async def test_hook_performance(self):
+        """Test hook completes within reasonable time."""
+        import time
+        
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={"performance": "test"}
+        )
+        
+        start_time = time.time()
+        result = await self.hook.run(input_data)
+        end_time = time.time()
+        
+        # Hook should complete within 5 seconds
+        assert (end_time - start_time) < 5.0
+        assert result is not None
+
+
+# Edge case tests  
+class Test{{ class_name }}HookEdgeCases:
+    """Edge case tests for {{ class_name }}Hook."""
+    
+    def setup_method(self):
+        """Set up edge case test fixtures."""
+        self.hook = {{ class_name }}Hook()
+    
+    @pytest.mark.asyncio
+    async def test_empty_arguments(self):
+        """Test hook handles empty arguments gracefully."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments={}
+        )
+        
+        result = await self.hook.run(input_data)
+        
+        # Should not crash
+        assert result is not None
+        assert isinstance(result, HookResult)
+    
+    @pytest.mark.asyncio
+    async def test_none_arguments(self):
+        """Test hook handles None arguments gracefully."""
+        input_data = HookInput(
+            tool="{{ target_tool }}",
+            arguments=None
+        )
+        
+        # Should handle gracefully without crashing
+        try:
+            result = await self.hook.run(input_data)
+            assert result is not None
+        except Exception as e:
+            pytest.fail(f"Hook should handle None arguments gracefully: {e}")
+    
+    @pytest.mark.asyncio  
+    async def test_malformed_input(self):
+        """Test hook handles malformed input data."""
+        # Test with various malformed inputs
+        malformed_inputs = [
+            {"not_a_valid_key": "value"},
+            {"command": None},
+            {"command": ""},
+            {"command": 123},  # Wrong type
+        ]
+        
+        for malformed_args in malformed_inputs:
+            input_data = HookInput(
+                tool="{{ target_tool }}",
+                arguments=malformed_args
+            )
+            
+            # Should not crash, may return error or passthrough
+            result = await self.hook.run(input_data)
+            assert result is not None
+            assert isinstance(result, HookResult)

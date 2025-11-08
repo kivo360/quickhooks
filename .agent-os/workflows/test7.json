@@ -1,0 +1,14 @@
+{
+  "name": "test7",
+  "description": "Test without category",
+  "steps": [
+    {
+      "instruction": "plan-product",
+      "category": "core",
+      "parameters": {},
+      "depends_on": [],
+      "condition": null
+    }
+  ],
+  "metadata": {}
+}

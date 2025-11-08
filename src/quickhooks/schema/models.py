@@ -3,7 +3,7 @@
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class HookCommand(BaseModel):
@@ -17,8 +17,9 @@ class HookCommand(BaseModel):
         None, gt=0, description="Timeout in seconds (must be > 0)"
     )
 
-    class Config:
-        extra = "forbid"  # Don't allow extra fields like 'description'
+    model_config = ConfigDict(
+        extra="forbid"
+    )  # Don't allow extra fields like 'description'
 
 
 class HookMatcher(BaseModel):
@@ -31,8 +32,7 @@ class HookMatcher(BaseModel):
         ..., min_items=1, description="Array of hook commands"
     )
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class HookInput(BaseModel):
@@ -45,8 +45,9 @@ class HookInput(BaseModel):
     tool_name: str = Field(..., description="Name of the tool being used")
     tool_input: dict[str, Any] = Field(..., description="Input parameters for the tool")
 
-    class Config:
-        extra = "allow"  # Allow additional fields for extensibility
+    model_config = ConfigDict(
+        extra="allow"
+    )  # Allow additional fields for extensibility
 
 
 class HookResponse(BaseModel):
@@ -62,9 +63,10 @@ class HookResponse(BaseModel):
         None, alias="stopReason", description="Reason when continue=false"
     )
 
-    class Config:
-        extra = "allow"  # Allow additional hook-specific fields
-        allow_population_by_field_name = True
+    model_config = ConfigDict(
+        extra="allow",  # Allow additional hook-specific fields
+        populate_by_name=True,
+    )
 
 
 class PreToolUseResponse(HookResponse):
@@ -81,9 +83,7 @@ class PreToolUseResponse(HookResponse):
         description="Reason for permission decision",
     )
 
-    class Config:
-        extra = "allow"
-        populate_by_name = True
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
 
 class PostToolUseResponse(HookResponse):
@@ -115,9 +115,7 @@ class UserPromptSubmitResponse(HookResponse):
         None, description="Context to add to the prompt"
     )
 
-    class Config:
-        extra = "allow"
-        populate_by_name = True
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
 
 class ClaudeSettings(BaseModel):
@@ -186,16 +184,16 @@ class ClaudeSettings(BaseModel):
 
         return v
 
-    class Config:
-        extra = "allow"  # Allow additional fields for extensibility
-        populate_by_name = True
+    model_config = ConfigDict(
+        extra="allow",  # Allow additional fields for extensibility
+        populate_by_name=True,
+    )
 
 
 class ValidatedClaudeSettings(ClaudeSettings):
     """Claude settings with strict validation against the official schema."""
 
-    class Config:
-        extra = "forbid"  # Strict mode - no extra fields allowed
+    model_config = ConfigDict(extra="forbid")  # Strict mode - no extra fields allowed
 
 
 def create_context_portal_hook_config(

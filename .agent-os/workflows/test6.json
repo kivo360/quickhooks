@@ -1,0 +1,14 @@
+{
+  "name": "test6",
+  "description": "Test with correct category",
+  "steps": [
+    {
+      "instruction": "plan-product",
+      "category": "single-agent",
+      "parameters": {},
+      "depends_on": [],
+      "condition": null
+    }
+  ],
+  "metadata": {}
+}

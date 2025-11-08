@@ -1,0 +1,619 @@
+openapi: 3.0.3
+info:
+  title: QuickHooks API
+  version: 0.1.1
+  description: |
+    A streamlined TDD framework for Claude Code hooks with intelligent agent analysis and discovery.
+
+    ## Overview
+    QuickHooks provides AI-powered prompt analysis using Groq and Pydantic AI, automatic agent discovery
+    from your `~/.claude/agents` directory, and semantic similarity matching with Chroma vector database.
+
+    ## Features
+    - 🧠 **Intelligent Agent Analysis**: AI-powered prompt analysis with automatic agent discovery
+    - 🔧 **Development Tools**: Hot-reload development server with test-driven development workflow
+    - 🔗 **Claude Code Integration**: Seamless hook integration with automatic prompt modification
+
+    ## Authentication
+    Currently, QuickHooks does not require authentication for local development.
+
+    ## Rate Limiting
+    No rate limiting is implemented for local usage.
+
+  contact:
+    email: kivo360@gmail.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /version:
+    get:
+      summary: Get QuickHooks version
+      description: Retrieve the current version of QuickHooks
+      operationId: getVersion
+      tags:
+        - System
+      responses:
+        '200':
+          description: Successful version response
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "QuickHooks v0.1.1"
+
+  /hello:
+    get:
+      summary: Say hello
+      description: Simple greeting endpoint to test the API
+      operationId: sayHello
+      tags:
+        - System
+      parameters:
+        - name: name
+          in: query
+          description: Optional name to greet
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful greeting
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Hello, World!"
+
+  /hooks/run:
+    post:
+      summary: Execute a hook
+      description: |
+        Execute a QuickHooks hook file with the provided input data.
+        The hook file should contain a class that inherits from BaseHook.
+      operationId: runHook
+      tags:
+        - Hooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - hook_path
+              properties:
+                hook_path:
+                  type: string
+                  format: path
+                  description: Path to the hook file to execute
+                  example: "./hooks/my_hook.py"
+                input_data:
+                  type: object
+                  description: JSON input data for the hook
+                  default: {}
+                  example:
+                    event_type: "user_action"
+                    data:
+                      user_id: "123"
+                      action: "login"
+      responses:
+        '200':
+          description: Hook executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HookOutput'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Hook execution failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /hooks/test:
+    post:
+      summary: Run hook tests
+      description: |
+        Run tests for hooks and generate comprehensive reports.
+        Supports multiple output formats and parallel execution.
+      operationId: runTests
+      tags:
+        - Testing
+      parameters:
+        - name: hooks_directory
+          in: query
+          description: Directory containing hook files
+          required: false
+          schema:
+            type: string
+            format: path
+            default: "./hooks"
+        - name: tests_directory
+          in: query
+          description: Directory containing test files
+          required: false
+          schema:
+            type: string
+            format: path
+            default: "./tests"
+        - name: pattern
+          in: query
+          description: Pattern to filter test files by name
+          required: false
+          schema:
+            type: string
+        - name: parallel
+          in: query
+          description: Run tests in parallel
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: timeout
+          in: query
+          description: Timeout for each test in seconds
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+            default: 30
+        - name: format
+          in: query
+          description: Report format
+          required: false
+          schema:
+            type: string
+            enum: [text, json, junit]
+            default: text
+        - name: verbose
+          in: query
+          description: Enable verbose output
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Tests completed
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResults'
+            application/xml:
+              schema:
+                type: string
+        '400':
+          description: Invalid test parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /agents/analyze:
+    post:
+      summary: Analyze prompt for agent recommendations
+      description: |
+        Analyze a prompt using AI to determine the most appropriate agents for handling the request.
+        Supports automatic discovery of local agents from `~/.claude/agents` directory.
+      operationId: analyzePrompt
+      tags:
+        - Agent Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentAnalysisRequest'
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentAnalysisResponse'
+        '400':
+          description: Invalid request or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Analysis failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    HookInput:
+      type: object
+      description: Input data structure for hook execution
+      required:
+        - event_type
+        - data
+      properties:
+        event_type:
+          type: string
+          description: Type of event that triggered the hook
+          example: "user_login"
+        data:
+          type: object
+          description: Event data payload
+          example:
+            user_id: "123"
+            timestamp: "2024-01-15T10:30:00Z"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred
+          readOnly: true
+        context:
+          type: object
+          description: Additional execution context
+          default: {}
+        metadata:
+          $ref: '#/components/schemas/HookMetadata'
+
+    HookMetadata:
+      type: object
+      description: Metadata associated with a hook execution
+      required:
+        - source
+      properties:
+        source:
+          type: string
+          description: Source system or component that triggered the hook
+          example: "claude_code"
+        version:
+          type: string
+          description: Version of the hook or system
+          example: "1.0.0"
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags for categorization and filtering
+          default: []
+        extra:
+          type: object
+          description: Additional metadata fields
+          default: {}
+
+    HookOutput:
+      type: object
+      description: Output data structure from hook execution
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/HookStatus'
+        data:
+          type: object
+          description: Result data from hook execution
+          default: {}
+        message:
+          type: string
+          description: Human-readable status message
+          example: "Hook executed successfully"
+        error:
+          $ref: '#/components/schemas/HookError'
+        execution_time:
+          type: number
+          format: float
+          description: Execution time in seconds
+          example: 1.23
+
+    HookStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - success
+        - failed
+        - cancelled
+      description: Possible hook execution states
+
+    HookError:
+      type: object
+      description: Error information for failed hook executions
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Error code identifier
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Invalid input data provided"
+        details:
+          type: object
+          description: Additional error details and context
+
+    Error:
+      type: object
+      description: Standard error response
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request parameters"
+        details:
+          type: object
+          description: Additional error details
+        code:
+          type: string
+          description: Error code
+          example: "INVALID_REQUEST"
+
+    TestResults:
+      type: object
+      description: Results from hook test execution
+      properties:
+        total_tests:
+          type: integer
+          description: Total number of tests run
+          example: 10
+        passed_tests:
+          type: integer
+          description: Number of tests that passed
+          example: 8
+        failed_tests:
+          type: integer
+          description: Number of tests that failed
+          example: 2
+        execution_time:
+          type: number
+          format: float
+          description: Total execution time in seconds
+          example: 5.23
+        results:
+          type: object
+          description: Individual test results
+          additionalProperties:
+            $ref: '#/components/schemas/TestResult'
+
+    TestResult:
+      type: object
+      description: Result of an individual test
+      properties:
+        test_name:
+          type: string
+          description: Name of the test
+          example: "test_user_login_hook"
+        passed:
+          type: boolean
+          description: Whether the test passed
+          example: true
+        execution_time:
+          type: number
+          format: float
+          description: Test execution time in seconds
+          example: 0.45
+        error:
+          type: string
+          description: Error message if test failed
+        output:
+          type: string
+          description: Test output
+
+    AgentAnalysisRequest:
+      type: object
+      description: Request for agent analysis
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          description: The user prompt to analyze
+          example: "Write a Python function that sorts a list of dictionaries"
+        context:
+          type: string
+          description: Additional context for the analysis
+          example: "Working on a data processing pipeline"
+        confidence_threshold:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Minimum confidence threshold for recommendations
+          default: 0.7
+        model:
+          type: string
+          description: Groq model to use for analysis
+          default: "llama-3.3-70b-versatile"
+        enable_local_discovery:
+          type: boolean
+          description: Enable discovery of local agents
+          default: true
+
+    AgentAnalysisResponse:
+      type: object
+      description: Response from agent analysis
+      required:
+        - analysis_summary
+        - threshold_met
+        - recommended_agents
+        - claude_code_prompt_modification
+      properties:
+        analysis_summary:
+          type: string
+          description: Comprehensive summary of the analysis
+          example: "The prompt requires coding and data processing capabilities"
+        threshold_met:
+          type: boolean
+          description: Whether confidence threshold was met
+          example: true
+        recommended_agents:
+          type: array
+          description: List of recommended agents
+          items:
+            $ref: '#/components/schemas/AgentRecommendation'
+        discovered_agents:
+          type: array
+          description: List of discovered local agents
+          items:
+            $ref: '#/components/schemas/DiscoveredAgent'
+        multiple_agents_recommended:
+          type: boolean
+          description: Whether multiple agents would be beneficial
+          example: false
+        context_used:
+          type: array
+          description: Context chunks used in analysis
+          items:
+            $ref: '#/components/schemas/ContextChunk'
+        total_tokens_used:
+          type: integer
+          description: Total tokens used in analysis
+          example: 1250
+        claude_code_prompt_modification:
+          type: string
+          description: Modified prompt for Claude Code with agent recommendations
+          example: "Use the coding agent to write a Python function that sorts a list of dictionaries"
+
+    AgentRecommendation:
+      type: object
+      description: Recommended agent for handling the prompt
+      required:
+        - agent_type
+        - confidence
+        - priority
+        - reasoning
+      properties:
+        agent_type:
+          type: string
+          description: Type of agent recommended
+          example: "coding"
+        confidence:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score for this recommendation
+          example: 0.85
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Priority ranking (1=highest priority)
+          example: 2
+        reasoning:
+          type: string
+          description: Reasoning for this recommendation
+          example: "The prompt requires writing Python code with data structure manipulation"
+
+    DiscoveredAgent:
+      type: object
+      description: Information about a discovered local agent
+      required:
+        - name
+        - path
+        - description
+        - capabilities
+        - similarity_score
+      properties:
+        name:
+          type: string
+          description: Name of the discovered agent
+          example: "python_data_analyst"
+        path:
+          type: string
+          format: path
+          description: Path to the agent file
+          example: "/Users/user/.claude/agents/python_data_analyst.py"
+        description:
+          type: string
+          description: Description of what the agent does
+          example: "Specializes in Python data analysis and manipulation"
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: List of agent capabilities
+          example: ["coding", "analysis", "data_processing"]
+        similarity_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Similarity score with the prompt
+          example: 0.92
+        usage_pattern:
+          type: string
+          description: How to use this agent
+          example: "Use for Python data analysis tasks involving pandas and numpy"
+
+    ContextChunk:
+      type: object
+      description: A chunk of context used in analysis
+      required:
+        - content
+        - chunk_type
+      properties:
+        content:
+          type: string
+          description: The content of the context chunk
+          example: "Working with large datasets that require efficient sorting"
+        chunk_type:
+          type: string
+          description: Type of context chunk
+          example: "additional_context"
+        tokens:
+          type: integer
+          description: Number of tokens in this chunk
+          example: 156
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Authentication required"
+            code: "UNAUTHORIZED"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Rate limit exceeded"
+            code: "RATE_LIMIT_EXCEEDED"
+            details:
+              retry_after: 60
+
+tags:
+  - name: System
+    description: System-level operations
+  - name: Hooks
+    description: Hook execution and management
+  - name: Testing
+    description: Test execution and reporting
+  - name: Agent Analysis
+    description: AI-powered agent analysis and recommendations

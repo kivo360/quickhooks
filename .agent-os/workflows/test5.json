@@ -1,0 +1,14 @@
+{
+  "name": "test5",
+  "description": "Local test",
+  "steps": [
+    {
+      "instruction": "plan-product",
+      "category": "core",
+      "parameters": {},
+      "depends_on": [],
+      "condition": null
+    }
+  ],
+  "metadata": {}
+}

@@ -1,0 +1,146 @@
+"""Tests for {{ hook_name }} hook."""
+
+import pytest
+from quickhooks.models import HookInput, HookOutput, ExecutionContext
+from {{ module_path }} import {{ class_name }}
+
+
+class Test{{ class_name }}:
+    """Test suite for {{ class_name }}."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.hook = {{ class_name }}()
+        self.context = ExecutionContext()
+    
+    def test_process_success(self):
+        """Test successful hook processing."""
+        # Arrange
+        hook_input = HookInput(
+            tool_name="{{ test_tool_name | default('TestTool') }}",
+            tool_input={{ test_input | default('{"test": "data"}') | safe }},
+            context=self.context
+        )
+        
+        # Act
+        result = self.hook.process(hook_input)
+        
+        # Assert
+        assert isinstance(result, HookOutput)
+        assert result.allowed is True
+        assert result.tool_name == "{{ test_tool_name | default('TestTool') }}"
+        assert result.message
+    
+    {% if hook_type == "validator" %}
+    def test_validation_failure(self):
+        """Test validation failure scenario."""
+        # Arrange
+        invalid_input = HookInput(
+            tool_name="TestTool",
+            tool_input={"invalid": "data"},
+            context=self.context
+        )
+        
+        # Act
+        result = self.hook.process(invalid_input)
+        
+        # Assert
+        assert isinstance(result, HookOutput)
+        # TODO: Add specific validation failure assertions
+    
+    def test_validation_success(self):
+        """Test validation success scenario."""
+        # Arrange
+        valid_input = HookInput(
+            tool_name="TestTool", 
+            tool_input={"valid": "data"},
+            context=self.context
+        )
+        
+        # Act
+        result = self.hook.process(valid_input)
+        
+        # Assert
+        assert isinstance(result, HookOutput)
+        assert result.allowed is True
+    {% elif hook_type == "transformer" %}
+    def test_transformation(self):
+        """Test input transformation."""
+        # Arrange
+        hook_input = HookInput(
+            tool_name="TestTool",
+            tool_input={"original": "data"},
+            context=self.context
+        )
+        
+        # Act
+        result = self.hook.process(hook_input)
+        
+        # Assert
+        assert isinstance(result, HookOutput)
+        assert result.modified is True
+        # TODO: Add specific transformation assertions
+    
+    def test_no_transformation_needed(self):
+        """Test when no transformation is needed."""
+        # Arrange
+        hook_input = HookInput(
+            tool_name="TestTool",
+            tool_input={"already_correct": "data"},
+            context=self.context
+        )
+        
+        # Act  
+        result = self.hook.process(hook_input)
+        
+        # Assert
+        assert isinstance(result, HookOutput)
+        # TODO: Add specific no-transformation assertions
+    {% endif %}
+    
+    {% for tool_name in tool_names | default([]) %}
+    def test_{{ tool_name | lower }}_tool_handling(self):
+        """Test handling of {{ tool_name }} tool."""
+        # Arrange
+        hook_input = HookInput(
+            tool_name="{{ tool_name }}",
+            tool_input={"test": "data"},
+            context=self.context
+        )
+        
+        # Act
+        result = self.hook.process(hook_input)
+        
+        # Assert
+        assert isinstance(result, HookOutput)
+        assert result.tool_name == "{{ tool_name }}"
+        # TODO: Add tool-specific assertions
+    
+    {% endfor %}
+    
+    def test_edge_cases(self):
+        """Test edge cases and error handling."""
+        # Test empty input
+        empty_input = HookInput(
+            tool_name="TestTool",
+            tool_input={},
+            context=self.context
+        )
+        
+        result = self.hook.process(empty_input)
+        assert isinstance(result, HookOutput)
+        
+        # TODO: Add more edge case tests
+    
+    {% if hook_methods | default([]) | length > 0 %}
+    {% for method in hook_methods %}
+    def test_{{ method.name }}(self):
+        """Test {{ method.name }} method."""
+        # TODO: Implement test for {{ method.name }}
+        {% if method.description %}
+        # {{ method.description }}
+        {% endif %}
+        pass
+    
+    {% endfor %}
+    {% endif %}

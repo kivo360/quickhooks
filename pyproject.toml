@@ -28,9 +28,81 @@ dependencies = [
     "sentence-transformers>=2.2.0", # For text embeddings
     "mermaid-py>=0.8.0",
     "pydantic-settings>=2.10.1",
+    "jinja2>=3.1.0", # Template engine for code generation
+    "ipython>=9.4.0",
+    "lancedb>=0.24.2",
 ]
 
 [project.optional-dependencies]
+# Core feature groups
+ai = [
+    "lancedb>=0.8.0",
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+]
+
+search = [
+    "tantivy>=0.21.0",
+    "lancedb[fts]>=0.8.0",
+]
+
+analytics = [
+    "pyarrow>=12.0.0",
+    "polars>=0.20.0", 
+    "duckdb>=0.9.0",
+    "pandas>=2.0.0",
+    "plotly>=5.15.0",
+]
+
+agents = [
+    "openai>=1.0.0",
+    "groq>=0.4.0",
+    "anthropic>=0.18.0",
+    "tiktoken>=0.5.0",
+]
+
+scaffold = [
+    "cookiecutter>=2.1.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+]
+
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "streamlit>=1.25.0",
+    "websockets>=11.0.0",
+]
+
+cloud = [
+    "boto3>=1.28.0",
+    "azure-storage-blob>=12.17.0",
+    "google-cloud-storage>=2.10.0",
+    "redis>=4.6.0",
+    "celery>=5.3.0",
+]
+
+enterprise = [
+    "cryptography>=41.0.0",
+    "pyjwt>=2.8.0",
+    "ldap3>=2.9.0",
+    "prometheus-client>=0.17.0",
+]
+
+agent_os = [
+    # Agent OS integration dependencies
+    # Most are already included in base dependencies
+    "psutil>=5.9.0",  # For system monitoring in workflows
+]
+
+performance = [
+    "redis>=4.6.0",
+    "aiocache>=0.12.0",
+    "psutil>=5.9.0",
+]
+
+# Development tools
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.23.0",
@@ -40,6 +112,43 @@ dev = [
     "ruff>=0.1.9",
     "pre-commit>=3.0.0",
     "rich>=13.7.0",
+]
+
+# Combined groups
+essential = [
+    "quickhooks[ai]",
+    "quickhooks[search]",
+    "quickhooks[dev]",
+]
+
+pro = [
+    "quickhooks[essential]",
+    "quickhooks[analytics]",
+    "quickhooks[scaffold]",
+    "quickhooks[agents]",
+    "quickhooks[agent_os]",
+]
+
+enterprise-full = [
+    "quickhooks[pro]",
+    "quickhooks[web]",
+    "quickhooks[cloud]",
+    "quickhooks[enterprise]",
+    "quickhooks[performance]",
+]
+
+all = [
+    "quickhooks[ai]",
+    "quickhooks[search]",
+    "quickhooks[analytics]",
+    "quickhooks[agents]",
+    "quickhooks[scaffold]",
+    "quickhooks[web]",
+    "quickhooks[cloud]",
+    "quickhooks[enterprise]",
+    "quickhooks[agent_os]",
+    "quickhooks[dev]",
+    "quickhooks[performance]",
 ]
 
 [project.scripts]
@@ -62,6 +171,7 @@ dev-dependencies = [
     "rich>=13.7.0",
     "build>=0.10.0",
     "twine>=4.0.0",
+    "toml>=0.10.0",  # For semver automation
 ]
 
 [tool.uv.sources]

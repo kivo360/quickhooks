@@ -1,0 +1,31 @@
+{
+  "hooks": [
+    {
+      "type": "pre_tool_use",
+      "path": "/path/to/quickhooks/hooks/agent_os_workflow_hook.py",
+      "enabled": true,
+      "config": {
+        "QUICKHOOKS_AGENT_OS_ENABLED": "true",
+        "AGENT_OS_PATH": "~/.agent-os",
+        "QUICKHOOKS_AGENT_OS_CATEGORY": "core",
+        "QUICKHOOKS_AGENT_OS_VERBOSE": "false"
+      }
+    },
+    {
+      "type": "pre_tool_use",
+      "path": "/path/to/quickhooks/hooks/agent_analysis_hook.py",
+      "enabled": true,
+      "config": {
+        "QUICKHOOKS_AGENT_ANALYSIS_ENABLED": "true",
+        "GROQ_API_KEY": "${GROQ_API_KEY}",
+        "QUICKHOOKS_AGENT_MODEL": "llama-3.3-70b-versatile",
+        "QUICKHOOKS_AGENT_CONFIDENCE_THRESHOLD": "0.7"
+      }
+    }
+  ],
+  "settings": {
+    "enable_intelligent_agent_selection": true,
+    "auto_prompt_modification": true,
+    "context_aware_execution": true
+  }
+}

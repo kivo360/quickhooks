@@ -70,7 +70,7 @@ class ParallelHook(BaseHook):
 
             # Extract successful results
             successful_results = [
-                r.execution_result.output for r in results if r.success
+                r.execution_result.output_data for r in results if r.success
             ]
 
             # Aggregate results

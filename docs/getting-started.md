@@ -12,6 +12,23 @@ pip install quickhooks
 
 ### 1. Create Your First Hook
 
+**Option A: Using the Template Generator (Recommended)**
+
+```bash
+# Interactive hook creation
+python scripts/create-hook.py my_first_hook --interactive
+
+# Or non-interactive with defaults
+python scripts/create-hook.py my_first_hook \
+  --description "A simple hook that adds timestamps" \
+  --type validator \
+  --test
+```
+
+This will generate both the hook class and test files using Jinja2 templates.
+
+**Option B: Manual Creation**
+
 ```python
 # hooks/my_first_hook.py
 from quickhooks.hooks.base import BaseHook
@@ -110,6 +127,130 @@ class MyHook(BaseHook):
 - `tool_input`: Tool parameters (can be modified)
 - `message`: Status message
 - `metadata`: Additional metadata
+
+## Template System
+
+QuickHooks includes a powerful Jinja2-based template system for code generation:
+
+### Template Utilities
+
+```python
+from quickhooks.utils.jinja_utils import CodeGenerator, TemplateRenderer
+
+# Generate hook classes
+generator = CodeGenerator()
+hook_code = generator.generate_hook_class(
+    hook_name="security_validator",
+    description="Validates tool calls for security compliance",
+    base_class="BaseHook"
+)
+
+# Generate config classes
+config_code = generator.generate_config_class(
+    config_name="validator_config",
+    fields={
+        "max_file_size": {
+            "type": "int",
+            "default": 1000000,
+            "description": "Maximum file size in bytes"
+        }
+    }
+)
+```
+
+### Template Files
+
+Templates are stored in `templates/` directory:
+
+- `templates/hook_class.py.j2` - Hook class template
+- `templates/test_hook.py.j2` - Test class template  
+- `templates/config_class.py.j2` - Configuration class template
+- `templates/cli_command.py.j2` - CLI command template
+- `templates/prompts/` - AI prompt templates
+
+### CLI Tools
+
+Use the CLI tools for quick development:
+
+```bash
+# Create hooks (local to project)
+quickhooks create hook my_hook --interactive
+
+# Create hooks globally (available from any project)
+quickhooks create hook my_global_hook --global --interactive
+
+# Create config classes  
+quickhooks create config my_config --interactive
+
+# Create CLI commands
+quickhooks create cli-command my_command
+```
+
+## Global Hooks System
+
+QuickHooks supports a global hooks system that allows you to create hooks once and use them across any project:
+
+### Setting Up Global Hooks
+
+```bash
+# Set up global hooks environment
+quickhooks global setup
+
+# Add global hooks directory to Python path (for current session)
+quickhooks global add-to-path
+
+# Check global hooks status
+quickhooks global info
+```
+
+### Creating Global Hooks
+
+```bash
+# Create a global hook
+quickhooks create hook security_validator --global \
+  --description "Global security validation hook" \
+  --type validator
+
+# List all global hooks
+quickhooks create list-global
+```
+
+### Using Global Hooks in Projects
+
+**Option 1: Environment Variable (Recommended)**
+```bash
+# Add to your shell profile (.bashrc, .zshrc, etc.)
+export PYTHONPATH=$PYTHONPATH:~/.quickhooks
+```
+
+**Option 2: Import Wrapper**
+```bash
+# Create a local import wrapper for a global hook
+quickhooks global import-hook security_validator --project .
+
+# Then import in your code
+from hooks.security_validator_global import SecurityValidatorHook
+```
+
+**Option 3: Direct Import (after setting PYTHONPATH)**
+```python
+from hooks.security_validator import SecurityValidatorHook
+```
+
+### Global Hooks Directory Structure
+
+```
+~/.quickhooks/
+├── hooks/
+│   ├── __init__.py
+│   ├── security_validator.py
+│   ├── path_enhancer.py
+│   ├── tests/
+│   │   ├── test_security_validator.py
+│   │   └── test_path_enhancer.py
+│   └── config/
+│       └── validator_config.py
+```
 
 ### Configuration
 

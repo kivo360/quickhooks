@@ -1,0 +1,154 @@
+"""{{ description }}"""
+
+import re
+from typing import Dict, List, Optional, Any
+import asyncio
+import json
+
+from quickhooks.hooks.base import BaseHook
+from quickhooks.models import HookInput, HookResult
+
+
+class {{ class_name }}Hook(BaseHook):
+    """{{ description }}
+    
+    Type: {{ hook_type.title() }}
+    Target Tool: {{ target_tool }}
+    Category: {{ category.title() }}
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.name = "{{ hook_name }}"
+        self.description = "{{ description }}"
+        self.hook_type = "{{ hook_type }}"
+        
+    async def run(self, input_data: HookInput) -> HookResult:
+        """Execute the {{ hook_type }} hook logic.
+        
+        Args:
+            input_data: The hook input containing tool and arguments
+            
+        Returns:
+            HookResult with continue_execution and any modifications
+        """
+        
+        # Only process {{ target_tool }} tool calls
+        if input_data.tool != "{{ target_tool }}":
+            return HookResult(continue_execution=True)
+        
+        {% if hook_type == 'validator' %}
+        # Validation logic
+        validation_result = await self._validate_input(input_data)
+        
+        if not validation_result.is_valid:
+            return HookResult(
+                continue_execution=False,
+                error_message=validation_result.error_message,
+                suggestions=validation_result.suggestions
+            )
+            
+        return HookResult(continue_execution=True)
+        
+        {% elif hook_type == 'transformer' %}
+        # Transformation logic
+        transformed_args = await self._transform_arguments(input_data.arguments)
+        
+        return HookResult(
+            continue_execution=True,
+            modified_arguments=transformed_args
+        )
+        
+        {% elif hook_type == 'analyzer' %}
+        # Analysis logic
+        analysis_result = await self._analyze_input(input_data)
+        
+        return HookResult(
+            continue_execution=True,
+            metadata={"analysis": analysis_result}
+        )
+        {% endif %}
+    
+    {% if hook_type == 'validator' %}
+    async def _validate_input(self, input_data: HookInput) -> 'ValidationResult':
+        """Validate the input according to defined rules."""
+        
+        {% for rule in rules %}
+        # Rule: {{ rule }}
+        if not await self._check_rule_{{ loop.index }}(input_data):
+            return ValidationResult(
+                is_valid=False,
+                error_message="Validation failed: {{ rule }}",
+                suggestions=["{{ rule | replace('not', 'should') }}"]
+            )
+        {% endfor %}
+        
+        return ValidationResult(is_valid=True)
+    
+    {% for rule in rules %}
+    async def _check_rule_{{ loop.index }}(self, input_data: HookInput) -> bool:
+        """Check validation rule: {{ rule }}"""
+        # TODO: Implement validation logic for: {{ rule }}
+        return True
+    {% endfor %}
+    
+    {% elif hook_type == 'transformer' %}
+    async def _transform_arguments(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Transform arguments according to defined rules."""
+        
+        transformed = arguments.copy()
+        
+        {% for rule in rules %}
+        # Transformation rule: {{ rule }}
+        transformed = await self._apply_transformation_{{ loop.index }}(transformed)
+        {% endfor %}
+        
+        return transformed
+    
+    {% for rule in rules %}
+    async def _apply_transformation_{{ loop.index }}(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply transformation: {{ rule }}"""
+        # TODO: Implement transformation logic for: {{ rule }}
+        return args
+    {% endfor %}
+    
+    {% elif hook_type == 'analyzer' %}
+    async def _analyze_input(self, input_data: HookInput) -> Dict[str, Any]:
+        """Analyze the input and return insights."""
+        
+        analysis = {
+            "timestamp": self._get_timestamp(),
+            "tool": input_data.tool,
+            "arguments_count": len(input_data.arguments),
+        }
+        
+        {% for aspect in rules %}
+        # Analysis aspect: {{ aspect }}
+        analysis["{{ aspect | lower | replace(' ', '_') }}"] = await self._analyze_{{ loop.index }}(input_data)
+        {% endfor %}
+        
+        return analysis
+    
+    {% for aspect in rules %}
+    async def _analyze_{{ loop.index }}(self, input_data: HookInput) -> Any:
+        """Analyze: {{ aspect }}"""
+        # TODO: Implement analysis logic for: {{ aspect }}
+        return {}
+    {% endfor %}
+    {% endif %}
+    
+    def _get_timestamp(self) -> str:
+        """Get current timestamp."""
+        import datetime
+        return datetime.datetime.now().isoformat()
+
+
+{% if hook_type == 'validator' %}
+class ValidationResult:
+    """Result of validation check."""
+    
+    def __init__(self, is_valid: bool, error_message: str = "", suggestions: List[str] = None):
+        self.is_valid = is_valid
+        self.error_message = error_message  
+        self.suggestions = suggestions or []
+{% endif %}

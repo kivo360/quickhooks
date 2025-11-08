@@ -1,0 +1,234 @@
+# {{ hook_name.replace('_', ' ').title() }} Hook
+
+## Overview
+{{ description }}
+
+## Specifications
+
+- **Type:** {{ hook_type.title() }}
+- **Target Tool:** `{{ target_tool }}`
+- **Category:** {{ category.title() }}
+- **Hook Name:** `{{ hook_name }}`
+
+## Features
+
+{% for feature in features %}
+- {{ feature }}
+{% endfor %}
+
+## Implementation Details
+
+### {{ hook_type.title() }} Rules
+
+{% for rule in rules %}
+{{ loop.index }}. **{{ rule }}**
+   - Implementation: `_{{ 'check_rule' if hook_type == 'validator' else 'apply_transformation' if hook_type == 'transformer' else 'analyze' }}_{{ loop.index }}()`
+   - Status: ⚠️ Requires implementation
+{% endfor %}
+
+## Usage Examples
+
+{% for example in examples %}
+### Example {{ loop.index }}: {{ example }}
+
+```json
+{
+  "tool": "{{ target_tool }}",
+  "arguments": {
+    "example_{{ loop.index }}": "sample_data"
+  }
+}
+```
+
+**Expected Behavior:**
+{% if hook_type == 'validator' %}
+- Validates input according to rule: {{ example }}
+- Returns `continue_execution: true/false` based on validation result
+{% elif hook_type == 'transformer' %}
+- Transforms input according to rule: {{ example }}
+- Returns modified arguments in `modified_arguments`
+{% elif hook_type == 'analyzer' %}
+- Analyzes input for: {{ example }}
+- Returns analysis data in `metadata.analysis`
+{% endif %}
+
+{% endfor %}
+
+## Installation
+
+### Global Installation (Recommended)
+
+This hook is installed globally in QuickHooks. To use it in any Claude Code project:
+
+1. **Add to Claude Code settings.json:**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "{{ target_tool }}",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ~/.quickhooks/hooks/{{ hook_name }}.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+2. **Verify installation:**
+
+```bash
+python ~/.quickhooks/hooks/{{ hook_name }}.py --help
+```
+
+### Local Project Installation
+
+For project-specific usage:
+
+1. Copy `{{ hook_name }}.py` to your project's `hooks/` directory
+2. Update your local `settings.json` with the local path
+
+## Development
+
+### File Structure
+
+```
+~/.quickhooks/hooks/
+├── {{ hook_name }}.py              # Main hook implementation
+├── {{ hook_name }}_README.md       # This documentation
+└── tests/
+    └── test_{{ hook_name }}.py      # Comprehensive test suite
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest ~/.quickhooks/hooks/tests/test_{{ hook_name }}.py -v
+
+# Run specific test categories  
+pytest ~/.quickhooks/hooks/tests/test_{{ hook_name }}.py::Test{{ class_name }}Hook -v
+pytest ~/.quickhooks/hooks/tests/test_{{ hook_name }}.py::Test{{ class_name }}HookPerformance -v
+pytest ~/.quickhooks/hooks/tests/test_{{ hook_name }}.py::Test{{ class_name }}HookEdgeCases -v
+```
+
+### Customization
+
+To customize this hook for your specific needs:
+
+1. **Edit the main hook file:**
+   ```bash
+   code ~/.quickhooks/hooks/{{ hook_name }}.py
+   ```
+
+2. **Implement the TODO sections:**
+   {% for rule in rules %}
+   - `_{{ 'check_rule' if hook_type == 'validator' else 'apply_transformation' if hook_type == 'transformer' else 'analyze' }}_{{ loop.index }}()`: {{ rule }}
+   {% endfor %}
+
+3. **Update tests:**
+   ```bash
+   code ~/.quickhooks/hooks/tests/test_{{ hook_name }}.py  
+   ```
+
+4. **Test your changes:**
+   ```bash
+   pytest ~/.quickhooks/hooks/tests/test_{{ hook_name }}.py -v
+   ```
+
+## Hook Behavior
+
+### Input Processing
+- **Target Tool:** Only processes `{{ target_tool }}` tool calls
+- **Passthrough:** Non-{{ target_tool }} tools pass through unchanged
+- **Error Handling:** Graceful handling of malformed inputs
+
+{% if hook_type == 'validator' %}
+### Validation Flow
+1. Check if tool matches `{{ target_tool }}`
+2. Run validation rules in sequence
+3. Return `continue_execution: false` if any rule fails
+4. Provide error messages and suggestions for fixes
+5. Return `continue_execution: true` if all rules pass
+
+### Validation Results
+- **Success:** `{"continue_execution": true}`
+- **Failure:** `{"continue_execution": false, "error_message": "...", "suggestions": [...]}`
+
+{% elif hook_type == 'transformer' %}
+### Transformation Flow  
+1. Check if tool matches `{{ target_tool }}`
+2. Copy original arguments
+3. Apply transformation rules in sequence
+4. Return modified arguments
+5. Preserve original data integrity
+
+### Transformation Results
+- **Always:** `{"continue_execution": true, "modified_arguments": {...}}`
+- **Passthrough:** Non-matching tools unchanged
+
+{% elif hook_type == 'analyzer' %}
+### Analysis Flow
+1. Check if tool matches `{{ target_tool }}`  
+2. Collect basic metadata (timestamp, tool, argument count)
+3. Run analysis aspects in parallel
+4. Compile comprehensive analysis report
+5. Return analysis data in metadata
+
+### Analysis Results
+- **Always:** `{"continue_execution": true, "metadata": {"analysis": {...}}}`
+- **Content:** Structured analysis data for downstream processing
+{% endif %}
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Hook not executing:**
+   - Verify `settings.json` path is correct
+   - Check file permissions: `chmod +x ~/.quickhooks/hooks/{{ hook_name }}.py`
+   - Test manually: `python ~/.quickhooks/hooks/{{ hook_name }}.py`
+
+2. **Import errors:**
+   - Ensure QuickHooks is properly installed
+   - Check Python path includes QuickHooks modules
+
+3. **Performance issues:**
+   - Review implementation of rules for efficiency
+   - Consider async/await patterns for I/O operations
+   - Run performance tests to identify bottlenecks
+
+### Debug Mode
+
+Enable debug logging by setting environment variable:
+
+```bash
+export QUICKHOOKS_DEBUG=1
+python -m quickhooks.cli.main run ~/.quickhooks/hooks/{{ hook_name }}.py --input '{"tool": "{{ target_tool }}", "arguments": {"debug": "test"}}'
+```
+
+## Contributing
+
+To contribute improvements to this hook:
+
+1. Fork the repository
+2. Create a feature branch
+3. Implement your changes
+4. Add comprehensive tests
+5. Update documentation
+6. Submit a pull request
+
+## License
+
+This hook is part of the QuickHooks project and follows the same license terms.
+
+---
+
+**Generated by QuickHooks Smart Generator**  
+*Created: {{ timestamp }}*  
+*Generator Version: 1.0.0*

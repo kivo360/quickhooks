@@ -13,7 +13,14 @@ import typer
 
 from quickhooks import __version__, console
 from quickhooks.agent_analysis.command import app as agent_analysis_app
+from quickhooks.cli.agent_os import app as agent_os_app
 from quickhooks.cli.install import install_app
+from quickhooks.cli.create import create_app
+from quickhooks.cli.global_hooks import global_app
+from quickhooks.cli.features import app as features_app
+from quickhooks.cli.smart import smart_app
+from quickhooks.cli.deploy import deploy_app
+from quickhooks.features import has_feature
 from quickhooks.hooks.base import BaseHook
 from quickhooks.models import HookInput
 from quickhooks.runner import TestRunner
@@ -28,8 +35,26 @@ app = typer.Typer(
 # Add installation subcommands
 app.add_typer(install_app, name="install")
 
+# Add creation subcommands
+app.add_typer(create_app, name="create")
+
+# Add global hooks management
+app.add_typer(global_app, name="global")
+
+# Add features management
+app.add_typer(features_app, name="features")
+
+# Add smart hook generation
+app.add_typer(smart_app, name="smart")
+
+# Add deployment commands
+app.add_typer(deploy_app, name="deploy")
+
 # Add agent analysis subcommands
 app.add_typer(agent_analysis_app, name="agents")
+
+# Add Agent OS subcommands
+app.add_typer(agent_os_app, name="agent-os")
 
 
 @app.command()

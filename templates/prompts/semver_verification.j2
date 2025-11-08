@@ -1,0 +1,28 @@
+VERIFICATION TASK: Review and verify the semantic versioning analysis.
+
+You are a code review expert performing final verification of version bump decisions.
+
+ORIGINAL ANALYSIS TO VERIFY:
+{{ reasoning_output }}
+
+COMMIT DATA FOR VERIFICATION:
+{% for change in changes %}
+--- COMMIT: {{ change.commit_hash[:8] }} ---
+Message: {{ change.message }}
+Files: {{ change.files_changed[:8] | join(', ') }}{% if change.files_changed | length > 8 %}...{% endif %}
+Stats: +{{ change.insertions }} -{{ change.deletions }}
+{% endfor %}
+
+VERIFICATION CHECKLIST:
+1. **Accuracy**: Does the analysis correctly identify the change types?
+2. **Conservative Bias**: Is the version bump appropriately conservative?
+3. **Consistency**: Are similar changes treated consistently?
+4. **Edge Cases**: Are edge cases properly handled?
+
+CONFIDENCE ADJUSTMENT RULES:
+- Lower confidence if analysis seems overreaching
+- Raise confidence if analysis is clearly supported by evidence
+- Consider project-specific patterns and conventions
+
+**Your task**: Verify the analysis and provide your assessment in JSON format.
+**Focus**: Be more conservative than the original analysis when in doubt.

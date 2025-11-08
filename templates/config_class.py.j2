@@ -1,0 +1,64 @@
+"""{{ description }}"""
+
+from typing import {{ type_imports | join(', ') }}
+from pydantic import BaseModel, Field{% if validator_imports %}, {{ validator_imports | join(', ') }}{% endif %}
+
+
+class {{ class_name }}(BaseModel):
+    """{{ description }}"""
+    
+    {% for field in fields %}
+    {{ field.name }}: {{ field.type }} = Field(
+        {% if field.default is defined %}default={{ field.default | repr }},{% endif %}
+        {% if field.description %}description="{{ field.description }}",{% endif %}
+        {% if field.constraints %}
+        {% for constraint, value in field.constraints.items() %}
+        {{ constraint }}={{ value | repr }},
+        {% endfor %}
+        {% endif %}
+    )
+    {% endfor %}
+    
+    {% if methods | default([]) | length > 0 %}
+    {% for method in methods %}
+    def {{ method.name }}(self{% for param in method.params %}, {{ param.name }}: {{ param.type }}{% if param.default is defined %} = {{ param.default | repr }}{% endif %}{% endfor %}){% if method.return_type %} -> {{ method.return_type }}{% endif %}:
+        """{{ method.description | default('Method description.') }}"""
+        {% if method.body %}
+        {{ method.body | indent(8) }}
+        {% else %}
+        # TODO: Implement {{ method.name }}
+        {% if method.return_type and method.return_type != 'None' %}
+        raise NotImplementedError("{{ method.name }} not implemented")
+        {% endif %}
+        {% endif %}
+    
+    {% endfor %}
+    {% endif %}
+    
+    {% if include_validation_methods %}
+    @classmethod
+    def from_dict(cls, data: dict) -> "{{ class_name }}":
+        """Create instance from dictionary."""
+        return cls(**data)
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return self.model_dump()
+    
+    def to_json(self) -> str:
+        """Convert to JSON string."""
+        return self.model_dump_json()
+    
+    @classmethod
+    def from_json(cls, json_str: str) -> "{{ class_name }}":
+        """Create instance from JSON string."""
+        return cls.model_validate_json(json_str)
+    {% endif %}
+    
+    {% if config_options %}
+    class Config:
+        """Pydantic configuration."""
+        {% for option, value in config_options.items() %}
+        {{ option }} = {{ value | repr }}
+        {% endfor %}
+    {% endif %}

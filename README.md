@@ -8,7 +8,7 @@
 [![Type Checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 [![Tests: pytest](https://img.shields.io/badge/tests-pytest-red.svg)](https://pytest.org/)
 
-A streamlined TDD framework for Claude Code hooks with intelligent agent analysis and discovery. Built with Python 3.12+ and modern UV package management, featuring automatic agent detection from your `~/.claude/agents` directory and smart prompt modification for optimal AI collaboration.
+A streamlined TDD framework for Claude Code hooks with intelligent agent analysis, discovery, and Agent OS integration. Built with Python 3.12+ and modern UV package management, featuring automatic agent detection from your `~/.claude/agents` directory, smart prompt modification for optimal AI collaboration, and seamless Agent OS workflow execution for spec-driven agentic development.
 
 ## 🚀 UV-Powered Development
 
@@ -22,6 +22,13 @@ QuickHooks leverages the blazing-fast [UV package manager](https://github.com/as
 - **Semantic similarity matching** with Chroma vector database
 - **Smart prompt modification** for guaranteed agent usage
 - **Context-aware chunking** for large inputs (up to 128K tokens)
+
+### 🤖 Agent OS Integration
+- **Spec-driven agentic development** with Agent OS workflows
+- **Instruction execution** directly from QuickHooks CLI
+- **Workflow management** with state persistence and resumption
+- **Claude Code integration** with automatic intent detection
+- **Pre/post-execution hooks** for comprehensive workflow support
 
 ### 🔧 Development Tools
 - **Hot-reload development server** with `watchfiles`
@@ -41,9 +48,15 @@ QuickHooks leverages the blazing-fast [UV package manager](https://github.com/as
 ### Quick Start (PyPI)
 ```bash
 # Install via pip (when published)
-pip install quickhooks[agent-analysis]
+pip install quickhooks[agent-analysis,agent_os]
 export GROQ_API_KEY=your_groq_api_key_here
+
+# Agent Analysis
 quickhooks agents analyze "Write a Python function"
+
+# Agent OS (requires Agent OS installation)
+quickhooks agent-os list-instructions
+quickhooks agent-os execute-instruction plan-product
 ```
 
 ### 🛠️ Development Installation with UV
@@ -231,6 +244,28 @@ quickhooks agents analyze "Debug this error" \
     --format rich
 ```
 
+### Agent OS Commands
+```bash
+# List available Agent OS instructions
+quickhooks agent-os list-instructions
+quickhooks agent-os list-instructions --category core
+
+# Execute Agent OS instructions
+quickhooks agent-os execute-instruction plan-product
+quickhooks agent-os execute-instruction create-spec --verbose
+
+# Workflow management
+quickhooks agent-os list-workflows
+quickhooks agent-os init-workflows
+quickhooks agent-os create-workflow my-workflow \
+  --description "Custom development workflow" \
+  --instructions "plan-product,create-spec,analyze-product"
+quickhooks agent-os execute-workflow product-planning
+
+# Show instruction details
+quickhooks agent-os show-instruction plan-product
+```
+
 ### Development Commands
 ```bash
 # Show version
@@ -251,10 +286,20 @@ For detailed documentation on the AI-powered agent analysis system, see [AGENT_A
 
 **Key Topics:**
 - 📄 **Complete API Reference** - All classes, methods, and types
-- 📝 **Agent File Formats** - Python, Markdown, JSON examples  
+- 📝 **Agent File Formats** - Python, Markdown, JSON examples
 - 🔗 **Claude Code Integration** - Step-by-step setup guide
 - 🔧 **Troubleshooting** - Common issues and solutions
 - 🏁 **Performance Optimization** - Tips for faster analysis
+
+### 🤖 Agent OS Integration
+For comprehensive documentation on the Agent OS integration, see [docs/agent-os-integration.md](docs/agent-os-integration.md).
+
+**Key Topics:**
+- 🔄 **Workflow Execution** - Execute predefined and custom workflows
+- 📋 **Instruction Management** - List and execute Agent OS instructions
+- 🔗 **Claude Code Integration** - Automatic intent detection and hook setup
+- ⚙️ **Configuration** - Environment variables and customization options
+- 🏗️ **API Reference** - Complete Python API for programmatic usage
 
 ### 🚀 UV Package Management
 Comprehensive guides for modern Python development with UV:
