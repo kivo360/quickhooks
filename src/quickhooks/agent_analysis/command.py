@@ -1,55 +1,79 @@
 """CLI command for agent analysis."""
 
+import sys
 from pathlib import Path
+from typing import Annotated
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
 from .analyzer import AgentAnalyzer
-from .types import AgentAnalysisRequest
+from .types import AgentAnalysisRequest, AgentAnalysisResponse
 
 console = Console()
-app = typer.Typer(name="agent-analysis", help="Analyze prompts for optimal agent usage")
+app = cyclopts.App(
+    name="agent-analysis", help="Analyze prompts for optimal agent usage"
+)
 
 
-@app.command("analyze")
 def analyze_prompt(
-    prompt: str = typer.Argument(
-        ..., help="The prompt to analyze for agent recommendations"
-    ),
-    context_file: Path | None = typer.Option(
-        None, "--context", "-c", help="Path to file containing additional context"
-    ),
-    context_text: str | None = typer.Option(
-        None, "--context-text", "-t", help="Additional context as text"
-    ),
-    threshold: float = typer.Option(
-        0.7,
-        "--threshold",
-        "-th",
-        min=0.0,
-        max=1.0,
-        help="Minimum confidence threshold for recommendations",
-    ),
-    max_tokens: int = typer.Option(
-        128000, "--max-tokens", "-m", help="Maximum context tokens to use"
-    ),
-    model: str = typer.Option(
-        "qwen/qwen3-32b", "--model", help="Groq model to use for analysis"
-    ),
-    output_format: str = typer.Option(
-        "rich", "--format", "-f", help="Output format: 'rich', 'json', or 'simple'"
-    ),
+    prompt: str,
+    context_file: Annotated[
+        Path | None,
+        Parameter("--context", alias="-c", help="Path to file containing additional context"),
+    ] = None,
+    context_text: Annotated[
+        str | None, Parameter("--context-text", alias="-t", help="Additional context as text")
+    ] = None,
+    threshold: Annotated[
+        float,
+        Parameter(
+            "--threshold",
+            alias="-th",
+            help="Minimum confidence threshold for recommendations",
+        ),
+    ] = 0.7,
+    max_tokens: Annotated[
+        int, Parameter("--max-tokens", alias="-m", help="Maximum context tokens to use")
+    ] = 128000,
+    model: Annotated[
+        str | None,
+        Parameter(
+            "--model",
+            help="Fireworks model to use for analysis (defaults to FIREWORKS_LLM)",
+        ),
+    ] = None,
+    output_format: Annotated[
+        str,
+        Parameter("--format", alias="-f", help="Output format: 'rich', 'json', or 'simple'"),
+    ] = "rich",
 ):
-    """
-    Analyze a prompt to determine which agents should be used and how.
+    """Analyze a prompt to determine which agents should be used and how.
 
     This command uses Groq with Pydantic AI to analyze your prompt and recommend
     the most appropriate AI agents based on the task requirements. It handles
     context length management automatically, chunking large contexts when needed.
+
+    Parameters
+    ----------
+    prompt
+        The prompt to analyze for agent recommendations
+    context_file
+        Path to file containing additional context
+    context_text
+        Additional context as text
+    threshold
+        Minimum confidence threshold for recommendations (default: 0.7)
+    max_tokens
+        Maximum context tokens to use (default: 128000)
+    model
+        Fireworks model to use for analysis (defaults to FIREWORKS_LLM)
+    output_format
+        Output format: 'rich', 'json', or 'simple' (default: "rich")
     """
     try:
         # Load context if provided
@@ -59,7 +83,7 @@ def analyze_prompt(
                 console.print(
                     f"[red]Error: Context file {context_file} not found[/red]"
                 )
-                raise typer.Exit(1)
+                sys.exit(1)
             context = context_file.read_text(encoding="utf-8")
         elif context_text:
             context = context_text
@@ -92,14 +116,14 @@ def analyze_prompt(
         console.print(
             "[yellow]Make sure GROQ_API_KEY environment variable is set[/yellow]"
         )
-        raise typer.Exit(1)
+        sys.exit(1)
     except Exception as e:
         console.print(f"[red]Analysis Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
 def _display_rich_output(
-    response: "AgentAnalysisResponse", request: AgentAnalysisRequest
+    response: AgentAnalysisResponse, request: AgentAnalysisRequest
 ):
     """Display analysis results in rich format."""
 
@@ -225,33 +249,17 @@ def _display_rich_output(
         )
 
 
-def _display_simple_output(response: "AgentAnalysisResponse"):
+def _display_simple_output(response: AgentAnalysisResponse):
     """Display analysis results in simple text format."""
 
-    print("=== AGENT ANALYSIS RESULTS ===")
-    print(f"Summary: {response.analysis_summary}")
-    print()
-
     if response.top_recommendation:
-        top = response.top_recommendation
-        print(f"TOP RECOMMENDATION: {top.agent_type.value}")
-        print(f"Confidence: {top.confidence:.2f}")
-        print(f"Reasoning: {top.reasoning}")
-        print()
+        pass
 
-    print("ALL RECOMMENDATIONS:")
-    for rec in sorted(response.recommendations, key=lambda x: x.priority):
-        status = "✓" if rec.threshold_met else "✗"
-        print(
-            f"{status} {rec.agent_type.value} (confidence: {rec.confidence:.2f}, priority: {rec.priority})"
-        )
-        print(f"   {rec.reasoning}")
-        print()
+    for _rec in sorted(response.recommendations, key=lambda x: x.priority):
+        pass
 
     if response.multiple_agents_recommended:
-        print("NOTE: Multiple agents working together are recommended.")
-
-    print(f"Tokens used: {response.total_tokens_used:,}")
+        pass
 
 
 if __name__ == "__main__":

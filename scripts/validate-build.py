@@ -21,7 +21,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
@@ -413,9 +414,7 @@ class BuildValidator:
                     f"import {metadata.name.replace('-', '_')}; print('Import successful')",
                 ]
 
-                subprocess.run(
-                    import_cmd, capture_output=True, text=True, check=True
-                )
+                subprocess.run(import_cmd, capture_output=True, text=True, check=True)
 
                 self.log("Package installation and import test passed", "success")
                 return True
@@ -543,15 +542,15 @@ class BuildValidator:
         return error_count == 0
 
 
-app = typer.Typer(help="QuickHooks Build Validation")
+app = cyclopts.App(help="QuickHooks Build Validation")
 
 
-@app.command()
+@app.command
 def validate(
-    verbose: bool = typer.Option(
+    verbose: bool = Parameter(
         False, "--verbose", "-v", help="Enable verbose output"
     ),
-    fix_issues: bool = typer.Option(
+    fix_issues: bool = Parameter(
         False, "--fix-issues", help="Attempt to fix detected issues"
     ),
 ):
@@ -569,8 +568,8 @@ def validate(
     sys.exit(0 if success else 1)
 
 
-@app.command()
-def checksum(algorithm: str = typer.Option("sha256", help="Hash algorithm to use")):
+@app.command
+def checksum(algorithm: str = Parameter("sha256", help="Hash algorithm to use")):
     """Generate checksums for built packages."""
 
     project_root = Path(__file__).parent.parent
@@ -578,12 +577,12 @@ def checksum(algorithm: str = typer.Option("sha256", help="Hash algorithm to use
 
     if not dist_path.exists():
         console.print("[red]dist/ directory not found[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
     artifacts = list(dist_path.glob("*"))
     if not artifacts:
         console.print("[red]No artifacts found in dist/[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
     table = Table(title="Package Checksums")
     table.add_column("File", style="cyan")

@@ -225,9 +225,11 @@ class TestAgentAnalyzer:
 
     def test_init_without_api_key_raises_error(self):
         """Test that missing API key raises ValueError."""
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ValueError, match="GROQ_API_KEY"):
-                AgentAnalyzer()
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            pytest.raises(ValueError, match="GROQ_API_KEY"),
+        ):
+            AgentAnalyzer()
 
     @patch.dict("os.environ", {"GROQ_API_KEY": "test-key"})
     def test_init_with_env_var(self):

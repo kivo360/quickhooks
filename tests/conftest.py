@@ -5,7 +5,6 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 
 from quickhooks import __version__
 from quickhooks.cli.main import app
@@ -23,14 +22,8 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 
 @pytest.fixture(scope="module")
-def runner() -> CliRunner:
-    """Fixture for invoking command-line interfaces."""
-    return CliRunner()
-
-
-@pytest.fixture(scope="module")
 def test_app():
-    """Fixture for testing Typer apps."""
+    """Fixture for testing Cyclopts apps."""
     return app
 
 

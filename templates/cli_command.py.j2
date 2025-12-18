@@ -1,36 +1,54 @@
 """{{ description }}"""
 
-import typer
-from typing import {{ type_imports | default(['Optional']) | join(', ') }}
+import sys
+from typing import Annotated, {{ type_imports | default(['Optional']) | join(', ') }}
 {% if additional_imports %}
 {% for import_line in additional_imports %}
 {{ import_line }}
 {% endfor %}
 {% endif %}
 
-app = typer.Typer(name="{{ command_name }}", help="{{ description }}")
+import cyclopts
+from cyclopts import Parameter
+from rich.console import Console
+
+app = cyclopts.App(name="{{ command_name }}", help="{{ description }}")
+console = Console()
 
 
-@app.command()
+@app.command
 def {{ main_command }}(
     {% for param in parameters %}
-    {{ param.name }}: {{ param.type }} = typer.{{ param.typer_type }}(
-        {% if param.default is defined %}{{ param.default | repr }}, {% endif %}
+    {% if param.typer_type == "Argument" %}
+    {{ param.name }}: {{ param.type }},
+    {% else %}
+    {{ param.name }}: Annotated[{{ param.type }}, Parameter(
+        {% if param.options %}{{ param.options | join(', ') }}, {% endif %}
         help="{{ param.description | default('Parameter description.') }}"
-        {% if param.options %}, {{ param.options | join(', ') }}{% endif %}
-    ),
+    )]{% if param.default is defined %} = {{ param.default | repr }}{% endif %},
+    {% endif %}
     {% endfor %}
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    verbose: Annotated[bool, Parameter("--verbose", "-v", help="Enable verbose output")] = False,
 ):
-    """{{ command_description | default(description) }}"""
+    """{{ command_description | default(description) }}
+    
+    Parameters
+    ----------
+    {% for param in parameters %}
+    {{ param.name }}
+        {{ param.description | default('Parameter description.') }}
+    {% endfor %}
+    verbose
+        Enable verbose output (default: False)
+    """
     {% if pre_execution_code %}
     {{ pre_execution_code | indent(4) }}
     {% endif %}
     
     if verbose:
-        typer.echo(f"Running {{ command_name }} with:")
+        console.print(f"Running {{ command_name }} with:")
         {% for param in parameters %}
-        typer.echo(f"  {{ param.name }}: {{'{'}}{{ param.name }}{{'}'}}")
+        console.print(f"  {{ param.name }}: {{'{'}}{{ param.name }}{{'}'}}")
         {% endfor %}
     
     try:
@@ -38,33 +56,44 @@ def {{ main_command }}(
         {{ main_logic | indent(8) }}
         {% else %}
         # TODO: Implement command logic
-        typer.echo("{{ command_name }} executed successfully!")
+        console.print("{{ command_name }} executed successfully!")
         {% endif %}
         
     except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
+        console.print(f"Error: {e}", style="red")
         if verbose:
             import traceback
             traceback.print_exc()
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
 {% for subcommand in subcommands | default([]) %}
-@app.command()
+@app.command
 def {{ subcommand.name }}(
     {% for param in subcommand.parameters | default([]) %}
-    {{ param.name }}: {{ param.type }} = typer.{{ param.typer_type }}(
-        {% if param.default is defined %}{{ param.default | repr }}, {% endif %}
+    {% if param.typer_type == "Argument" %}
+    {{ param.name }}: {{ param.type }},
+    {% else %}
+    {{ param.name }}: Annotated[{{ param.type }}, Parameter(
         help="{{ param.description | default('Parameter description.') }}"
-    ),
+    )]{% if param.default is defined %} = {{ param.default | repr }}{% endif %},
+    {% endif %}
     {% endfor %}
 ):
-    """{{ subcommand.description }}"""
+    """{{ subcommand.description }}
+    
+    Parameters
+    ----------
+    {% for param in subcommand.parameters | default([]) %}
+    {{ param.name }}
+        {{ param.description | default('Parameter description.') }}
+    {% endfor %}
+    """
     {% if subcommand.logic %}
     {{ subcommand.logic | indent(4) }}
     {% else %}
     # TODO: Implement {{ subcommand.name }} logic
-    typer.echo("{{ subcommand.name }} executed!")
+    console.print("{{ subcommand.name }} executed!")
     {% endif %}
 
 

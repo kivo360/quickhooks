@@ -23,7 +23,7 @@ def test_uv_python_commands():
 
         try:
             result = subprocess.run(
-                command.split(), capture_output=True, text=True, timeout=10
+                command.split(), capture_output=True, text=True, timeout=10, check=False
             )
 
             print(f"Exit code: {result.returncode}")
@@ -58,6 +58,7 @@ def test_uv_install_simulation():
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
 
         print("Currently installed Python versions:")
@@ -74,7 +75,11 @@ def test_uv_install_simulation():
     print("\n📦 Available Python versions for download:")
     try:
         result = subprocess.run(
-            ["uv", "python", "list"], capture_output=True, text=True, timeout=10
+            ["uv", "python", "list"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
 
         if result.stdout.strip():

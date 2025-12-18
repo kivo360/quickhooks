@@ -6,17 +6,13 @@ Uses st (directory indexing) and AI to analyze codebases and select optimal tool
 This hook maintains a cache of tool decisions and uses AI to analyze new projects.
 """
 
-import json
-import os
-import sqlite3
-import subprocess
-import sys
 import hashlib
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+import json
+import subprocess
+from dataclasses import asdict, dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 try:
     from groq import Groq
@@ -26,6 +22,7 @@ except ImportError:
 
 class ToolCategory(str, Enum):
     """Categories of development tools."""
+
     LINTER = "linter"
     FORMATTER = "formatter"
     TEST_RUNNER = "test_runner"
@@ -37,17 +34,18 @@ class ToolCategory(str, Enum):
 @dataclass
 class ToolDecision:
     """Represents a tool selection decision."""
+
     project_hash: str
     language: str
     category: ToolCategory
     selected_tool: str
     command: str
     confidence: float
-    reasons: List[str]
-    detected_configs: List[str]
+    reasons: list[str]
+    detected_configs: list[str]
     timestamp: str
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         return asdict(self)
 
@@ -55,49 +53,50 @@ class ToolDecision:
 @dataclass
 class ProjectAnalysis:
     """Results of project analysis."""
+
     primary_language: str
-    languages: List[str]
+    languages: list[str]
     structure_hash: str
-    config_files: List[str]
-    dependencies: Dict[str, List[str]]
+    config_files: list[str]
+    dependencies: dict[str, list[str]]
     project_type: str  # web, cli, library, etc.
-    framework: Optional[str]
-    test_framework: Optional[str]
-    build_system: Optional[str]
-    
-    def to_dict(self) -> Dict[str, Any]:
+    framework: str | None
+    test_framework: str | None
+    build_system: str | None
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
 
 class CodebaseAnalyzer:
     """Analyzes codebases using st tool and file inspection."""
-    
+
     def __init__(self, cwd: str):
         self.cwd = Path(cwd)
-        
-    def run_st_analysis(self) -> Dict[str, Any]:
+
+    def run_st_analysis(self) -> dict[str, Any]:
         """Run st tool to get project structure and statistics."""
         analyses = {}
-        
+
         # Run different st commands for comprehensive analysis
         st_commands = [
             ("project_overview", ["st", "project-overview", str(self.cwd)]),
             ("statistics", ["st", "get-statistics", str(self.cwd)]),
-            ("code_files", ["st", "find-code-files", "--languages", "all", str(self.cwd)]),
+            (
+                "code_files",
+                ["st", "find-code-files", "--languages", "all", str(self.cwd)],
+            ),
             ("config_files", ["st", "find-config-files", str(self.cwd)]),
             ("build_files", ["st", "find-build-files", str(self.cwd)]),
             ("test_files", ["st", "find-tests", str(self.cwd)]),
             ("semantic", ["st", "semantic-analysis", str(self.cwd)]),
         ]
-        
+
         for name, cmd in st_commands:
             try:
                 result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=10
+                    cmd, capture_output=True, text=True, timeout=10, check=False
                 )
                 if result.returncode == 0:
                     try:
@@ -108,33 +107,42 @@ class CodebaseAnalyzer:
                     analyses[name] = {"error": result.stderr}
             except Exception as e:
                 analyses[name] = {"error": str(e)}
-        
+
         return analyses
-    
-    def analyze_package_files(self) -> Dict[str, List[str]]:
+
+    def analyze_package_files(self) -> dict[str, list[str]]:
         """Analyze package files to detect dependencies."""
         dependencies = {}
-        
+
         # Python dependencies
         if (self.cwd / "requirements.txt").exists():
             with open(self.cwd / "requirements.txt") as f:
-                deps = [line.strip().split("==")[0] for line in f if line.strip() and not line.startswith("#")]
+                deps = [
+                    line.strip().split("==")[0]
+                    for line in f
+                    if line.strip() and not line.startswith("#")
+                ]
                 dependencies["python"] = deps
-        
+
         if (self.cwd / "pyproject.toml").exists():
             try:
                 import tomllib
+
                 with open(self.cwd / "pyproject.toml", "rb") as f:
                     data = tomllib.load(f)
                     deps = []
                     if "project" in data and "dependencies" in data["project"]:
                         deps.extend(data["project"]["dependencies"])
-                    if "tool" in data and "poetry" in data["tool"] and "dependencies" in data["tool"]["poetry"]:
+                    if (
+                        "tool" in data
+                        and "poetry" in data["tool"]
+                        and "dependencies" in data["tool"]["poetry"]
+                    ):
                         deps.extend(data["tool"]["poetry"]["dependencies"].keys())
                     dependencies["python"] = deps
             except:
                 pass
-        
+
         # JavaScript/TypeScript dependencies
         if (self.cwd / "package.json").exists():
             try:
@@ -148,7 +156,7 @@ class CodebaseAnalyzer:
                     dependencies["javascript"] = deps
             except:
                 pass
-        
+
         # Go dependencies
         if (self.cwd / "go.mod").exists():
             try:
@@ -164,11 +172,12 @@ class CodebaseAnalyzer:
                     dependencies["go"] = deps
             except:
                 pass
-        
+
         # Rust dependencies
         if (self.cwd / "Cargo.toml").exists():
             try:
                 import tomllib
+
                 with open(self.cwd / "Cargo.toml", "rb") as f:
                     data = tomllib.load(f)
                     deps = []
@@ -179,10 +188,10 @@ class CodebaseAnalyzer:
                     dependencies["rust"] = deps
             except:
                 pass
-        
+
         return dependencies
-    
-    def detect_framework(self, language: str, dependencies: List[str]) -> Optional[str]:
+
+    def detect_framework(self, language: str, dependencies: list[str]) -> str | None:
         """Detect the framework being used based on dependencies."""
         frameworks = {
             "python": {
@@ -210,64 +219,72 @@ class CodebaseAnalyzer:
                 "actix": ["actix-web"],
                 "rocket": ["rocket"],
                 "tokio": ["tokio"],
-            }
+            },
         }
-        
+
         if language not in frameworks:
             return None
-        
+
         for framework, markers in frameworks[language].items():
             if not markers:  # Built-in framework
                 continue
             if any(marker in dep.lower() for dep in dependencies for marker in markers):
                 return framework
-        
+
         return None
-    
-    def calculate_structure_hash(self, st_analysis: Dict[str, Any]) -> str:
+
+    def calculate_structure_hash(self, st_analysis: dict[str, Any]) -> str:
         """Calculate a hash of the project structure for caching."""
         # Create a stable representation of project structure
         structure_data = {
             "files": st_analysis.get("statistics", {}).get("total_files", 0),
             "languages": st_analysis.get("statistics", {}).get("languages", {}),
-            "config_files": sorted(st_analysis.get("config_files", {}).get("files", [])),
+            "config_files": sorted(
+                st_analysis.get("config_files", {}).get("files", [])
+            ),
             "build_files": sorted(st_analysis.get("build_files", {}).get("files", [])),
         }
-        
+
         structure_str = json.dumps(structure_data, sort_keys=True)
         return hashlib.sha256(structure_str.encode()).hexdigest()[:16]
-    
+
     def analyze(self) -> ProjectAnalysis:
         """Perform comprehensive project analysis."""
         # Run st analysis
         st_analysis = self.run_st_analysis()
-        
+
         # Analyze dependencies
         dependencies = self.analyze_package_files()
-        
+
         # Determine primary language
         stats = st_analysis.get("statistics", {})
         language_stats = stats.get("languages", {})
-        primary_language = max(language_stats.items(), key=lambda x: x[1])[0] if language_stats else "unknown"
-        
+        primary_language = (
+            max(language_stats.items(), key=lambda x: x[1])[0]
+            if language_stats
+            else "unknown"
+        )
+
         # Get all languages
         languages = list(language_stats.keys())
-        
+
         # Calculate structure hash
         structure_hash = self.calculate_structure_hash(st_analysis)
-        
+
         # Get config files
-        config_files = [f["path"] for f in st_analysis.get("config_files", {}).get("files", [])]
-        
+        config_files = [
+            f["path"] for f in st_analysis.get("config_files", {}).get("files", [])
+        ]
+
         # Detect framework
         primary_deps = dependencies.get(primary_language, [])
         framework = self.detect_framework(primary_language, primary_deps)
-        
+
         # Detect test framework
         test_framework = None
         if framework in ["pytest", "jest", "mocha"]:
             test_framework = framework
-        
+
         # Detect build system
         build_files = st_analysis.get("build_files", {}).get("files", [])
         build_system = None
@@ -276,23 +293,36 @@ class CodebaseAnalyzer:
             if name == "Makefile":
                 build_system = "make"
                 break
-            elif name == "CMakeLists.txt":
+            if name == "CMakeLists.txt":
                 build_system = "cmake"
                 break
-            elif name in ["pom.xml"]:
+            if name in ["pom.xml"]:
                 build_system = "maven"
                 break
-            elif name in ["build.gradle", "build.gradle.kts"]:
+            if name in ["build.gradle", "build.gradle.kts"]:
                 build_system = "gradle"
                 break
-        
+
         # Determine project type
         project_type = "library"  # default
-        if framework in ["django", "flask", "fastapi", "express", "nextjs", "gin", "echo", "actix"]:
+        if framework in [
+            "django",
+            "flask",
+            "fastapi",
+            "express",
+            "nextjs",
+            "gin",
+            "echo",
+            "actix",
+        ]:
             project_type = "web"
-        elif any("cli" in dep.lower() or "click" in dep.lower() for deps in dependencies.values() for dep in deps):
+        elif any(
+            "cli" in dep.lower() or "click" in dep.lower()
+            for deps in dependencies.values()
+            for dep in deps
+        ):
             project_type = "cli"
-        
+
         return ProjectAnalysis(
             primary_language=primary_language,
             languages=languages,
@@ -302,5 +332,5 @@ class CodebaseAnalyzer:
             project_type=project_type,
             framework=framework,
             test_framework=test_framework,
-            build_system=build_system
+            build_system=build_system,
         )

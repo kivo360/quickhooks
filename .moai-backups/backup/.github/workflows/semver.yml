@@ -1,0 +1,219 @@
+name: Automated SemVer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  analyze-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.semver.outputs.should_release }}
+      old_version: ${{ steps.semver.outputs.old_version }}
+      new_version: ${{ steps.semver.outputs.new_version }}
+      bump_type: ${{ steps.semver.outputs.bump_type }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for git analysis
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install semver script dependencies
+      run: |
+        pip install -r scripts/requirements-semver.txt
+    
+    - name: Run SemVer analysis
+      id: semver
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      run: |
+        cd ${{ github.workspace }}
+        
+        # Determine comparison reference based on event type
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          FROM_REF="${{ github.event.pull_request.base.sha }}"
+          TO_REF="${{ github.event.pull_request.head.sha }}"
+        else
+          # For push events, compare with previous commit
+          FROM_REF="HEAD~1"
+          TO_REF="HEAD"
+        fi
+        
+        echo "Analyzing changes from $FROM_REF to $TO_REF"
+        
+        # Run semver analysis
+        python scripts/semver-automation.py \
+          --from-ref "$FROM_REF" \
+          --to-ref "$TO_REF" \
+          --dry-run \
+          --verbose
+        
+        # Check if semver-output.json was created (would be created in non-dry-run)
+        # For now, parse the output to determine if we should release
+        
+        # Get current version for comparison
+        CURRENT_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+        echo "old_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # For demo purposes, set outputs based on commit message patterns
+        # In real usage, you'd parse the actual semver script output
+        if git log --oneline -1 | grep -E "(feat|BREAKING|major):" > /dev/null; then
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "bump_type=minor" >> $GITHUB_OUTPUT
+          # Calculate new version (simplified)
+          NEW_VERSION=$(python -c "
+        import toml
+        data = toml.load('pyproject.toml')
+        v = data['project']['version'].split('.')
+        v[1] = str(int(v[1]) + 1)
+        v[2] = '0'
+        print('.'.join(v))
+        ")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        elif git log --oneline -1 | grep -E "(fix|patch):" > /dev/null; then
+          echo "should_release=true" >> $GITHUB_OUTPUT
+          echo "bump_type=patch" >> $GITHUB_OUTPUT
+          NEW_VERSION=$(python -c "
+        import toml
+        data = toml.load('pyproject.toml')
+        v = data['project']['version'].split('.')
+        v[2] = str(int(v[2]) + 1)
+        print('.'.join(v))
+        ")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "should_release=false" >> $GITHUB_OUTPUT
+          echo "bump_type=none" >> $GITHUB_OUTPUT
+          echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Comment on PR with version analysis
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { should_release, old_version, new_version, bump_type } = context.payload.client_payload || {};
+          
+          const comment = should_release === 'true' 
+            ? `🎯 **SemVer Analysis**
+          
+          This PR will trigger a **${bump_type}** version bump:
+          - Current: \`${old_version}\`
+          - New: \`${new_version}\`
+          
+          The automated analysis detected changes that require a version update.`
+            : `📋 **SemVer Analysis**
+          
+          This PR contains changes that do not require a version bump:
+          - Current version: \`${old_version}\`
+          - Analysis: Documentation, tests, or non-functional changes only
+          
+          No release will be triggered.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  auto-release:
+    needs: analyze-version
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' && 
+      needs.analyze-version.outputs.should_release == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python and uv
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install uv
+      run: pip install uv
+    
+    - name: Install semver script dependencies
+      run: |
+        pip install -r scripts/requirements-semver.txt
+    
+    - name: Update version
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      run: |
+        python scripts/semver-automation.py \
+          --from-ref "HEAD~1" \
+          --to-ref "HEAD" \
+          --verbose
+    
+    - name: Commit version bump
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add pyproject.toml
+        git commit -m "chore: bump version to ${{ needs.analyze-version.outputs.new_version }} [skip ci]" || exit 0
+        git push
+    
+    - name: Build package
+      run: |
+        uv build
+    
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: "v${{ needs.analyze-version.outputs.new_version }}"
+        release_name: "Release v${{ needs.analyze-version.outputs.new_version }}"
+        body: |
+          ## Changes
+          
+          Automated release based on SemVer analysis.
+          
+          **Bump Type:** ${{ needs.analyze-version.outputs.bump_type }}
+          **Previous Version:** ${{ needs.analyze-version.outputs.old_version }}
+          **New Version:** ${{ needs.analyze-version.outputs.new_version }}
+          
+          See commit history for detailed changes.
+        draft: false
+        prerelease: false
+    
+    - name: Publish to PyPI
+      env:
+        PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        uv publish --token $PYPI_API_TOKEN
+
+  notify-completion:
+    needs: [analyze-version, auto-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify completion
+      run: |
+        if [ "${{ needs.auto-release.result }}" = "success" ]; then
+          echo "✅ Successfully released version ${{ needs.analyze-version.outputs.new_version }}"
+        elif [ "${{ needs.analyze-version.outputs.should_release }}" = "false" ]; then
+          echo "📋 No release needed - analysis complete"
+        else
+          echo "❌ Release failed or was skipped"
+        fi

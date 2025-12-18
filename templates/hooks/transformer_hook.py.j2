@@ -1,0 +1,147 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+# ]
+# ///
+"""
+{{ description }}
+
+{{ capabilities | join(', ') | title }}
+"""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Any, Dict, List
+
+from pydantic import BaseModel, Field
+
+
+class {{ class_name }}Input(BaseModel):
+    """Input schema for {{ class_name }} transformer hook."""
+
+    {% for field in input_fields %}
+    {{ field.name }}: {{ field.type }} = Field(
+        {% if field.required %}...{% else %}{{ field.default }}{% endif %},
+        description="{{ field.description }}"
+    )
+    {% endfor %}
+
+
+class {{ class_name }}Output(BaseModel):
+    """Output schema for {{ class_name }} transformer hook."""
+
+    status: str = Field(..., description="Execution status")
+    data: Dict[str, Any] = Field(default_factory=dict, description="Transformed data")
+    message: str = Field(..., description="Status message")
+    transformations: List[str] = Field(default_factory=list, description="List of transformations applied")
+
+
+class {{ class_name }}:
+    """{{ class_name }} transformer hook for QuickHooks.
+
+    {{ description }}
+    """
+
+    def __init__(self):
+        """Initialize the transformer hook."""
+        pass
+
+    def _apply_transformation_rules(self, data: Any) -> Any:
+        """Apply transformation rules to the input data.
+
+        Args:
+            data: Input data to transform
+
+        Returns:
+            Transformed data
+        """
+        transformed = data
+
+        # Apply each transformation rule
+        {% for rule in transformation_rules %}
+        # {{ rule.description }}
+        if isinstance(transformed, {{ rule.input_type }}):
+            try:
+                # {{ rule.example }}
+                pass  # TODO: Implement {{ rule.name }}
+            except Exception:
+                pass  # Skip transformation on error
+        {% endfor %}
+
+        return transformed
+
+    async def execute(self, input_data: {{ class_name }}Input) -> {{ class_name }}Output:
+        """Execute the {{ class_name }} transformer hook.
+
+        Args:
+            input_data: The input data for the hook
+
+        Returns:
+            {{ class_name }}Output: The result of the transformation
+        """
+        try:
+            # Extract the data to transform
+            {% for field in input_fields %}
+            {% if field.name != 'metadata' %}
+            source_data = input_data.{{ field.name }}
+            {% endif %}
+            {% endfor %}
+
+            # Apply transformations
+            transformed_data = self._apply_transformation_rules(source_data)
+
+            # Track transformations
+            transformations_applied = [
+                {% for rule in transformation_rules %}
+                "{{ rule.name }}",
+                {% endfor %}
+            ]
+
+            return {{ class_name }}Output(
+                status="success",
+                data={"transformed": transformed_data},
+                message="{{ class_name }} transformation completed successfully",
+                transformations=transformations_applied
+            )
+
+        except Exception as e:
+            return {{ class_name }}Output(
+                status="error",
+                data={},
+                message=f"{{ class_name }} transformation failed: {str(e)}",
+                transformations=[]
+            )
+
+
+async def main():
+    """Main entry point for the transformer hook."""
+    # Read input from stdin
+    input_json = sys.stdin.read()
+
+    try:
+        input_data = {{ class_name }}Input.model_validate_json(input_json)
+    except Exception as e:
+        error_output = {
+            "status": "error",
+            "data": {},
+            "message": f"Invalid input: {str(e)}",
+            "transformations": []
+        }
+        print(json.dumps(error_output, indent=2))
+        sys.exit(1)
+
+    # Create and run transformer
+    transformer = {{ class_name }}()
+    result = await transformer.execute(input_data)
+
+    # Output result
+    print(json.dumps(result.model_dump(), indent=2))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

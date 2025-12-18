@@ -87,7 +87,10 @@ class AgentAnalysisHook:
             return False
 
         # Skip if input already mentions agents explicitly
-        return not ("agent" in user_input.lower() and ("use" in user_input.lower() or "with" in user_input.lower()))
+        return not (
+            "agent" in user_input.lower()
+            and ("use" in user_input.lower() or "with" in user_input.lower())
+        )
 
     def analyze_and_modify_prompt(
         self, user_input: str, context: str = ""
@@ -170,7 +173,7 @@ class AgentAnalysisHook:
                 "original_prompt": user_input,
                 "modified_prompt": user_input,
                 "analysis": None,
-                "reason": f"Analysis failed: {str(e)}",
+                "reason": f"Analysis failed: {e!s}",
             }
 
 

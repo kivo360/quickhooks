@@ -1,0 +1,122 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+#     "pytest>=7.0.0",
+#     "pytest-asyncio>=0.21.0",
+# ]
+# ///
+"""
+Test suite for {{ class_name }} validator hook.
+
+This test suite validates that the {{ class_name }} hook correctly
+validates input data and enforces business rules.
+"""
+
+import asyncio
+import json
+import pytest
+from typing import Any, Dict
+
+# Import the hook to test
+from {{ hook_name }} import {{ class_name }}, {{ class_name }}Input
+
+
+class Test{{ class_name }}:
+    """Test cases for {{ class_name }} validator hook."""
+
+    @pytest.fixture
+    def validator(self):
+        """Create {{ class_name }} validator instance."""
+        return {{ class_name }}()
+
+    {% for test in test_cases %}
+    @pytest.mark.asyncio
+    async def test_{{ test.name }}(self, validator):
+        """Test case: {{ test.description }}"""
+
+        # Prepare test input
+        test_input = {{ class_name }}Input(**{{ test.input }})
+
+        # Execute validator
+        result = await validator.execute(test_input)
+
+        # Assert results
+        {% if test.expected_success %}
+        assert result.status == "success"
+        assert result.allowed == True
+        assert result.validation_errors == []
+        {% else %}
+        assert result.status in ["failed", "error"]
+        assert result.allowed == False
+        assert len(result.validation_errors) > 0
+        {% endif %}
+
+        # Verify message
+        assert "{{ test.expected_keyword | default('validation') }}" in result.message.lower()
+
+    {% endfor %}
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_schema(self, validator):
+        """Test handling of invalid input schema."""
+
+        # Test with invalid JSON input
+        invalid_input = {
+            "invalid_field": "test_value"
+            # Missing required fields
+        }
+
+        test_input = {{ class_name }}Input(**invalid_input)
+        result = await validator.execute(test_input)
+
+        assert result.status == "failed"
+        assert result.allowed == False
+        assert len(result.validation_errors) > 0
+
+    @pytest.mark.asyncio
+    async def test_error_handling(self, validator):
+        """Test error handling in validator."""
+
+        # Test with data that might cause exceptions
+        problematic_input = {{ class_name }}Input(**{{ error_test_input | default({'test_field': None}) }})
+
+        result = await validator.execute(problematic_input)
+
+        # Should handle errors gracefully
+        assert result.status in ["failed", "error"]
+        assert result.allowed == False
+        assert len(result.validation_errors) > 0
+
+    @pytest.mark.asyncio
+    async def test_validator_integration(self, validator):
+        """Test validator integration with JSON input/output."""
+
+        # Test JSON input validation (simulating hook input)
+        json_input = """{{ integration_test_input | default({'test_field': 'test_value'}) | tojson }}"""
+
+        # Parse and validate
+        input_data = json.loads(json_input)
+        test_input = {{ class_name }}Input(**input_data)
+
+        result = await validator.execute(test_input)
+
+        # Verify output is serializable
+        output_json = json.dumps(result.model_dump())
+        assert json.loads(output_json)  # Should not raise exception
+
+    def test_validator_configuration(self):
+        """Test validator initialization and configuration."""
+
+        validator = {{ class_name }}()
+
+        # Verify validator is properly initialized
+        assert validator is not None
+        assert hasattr(validator, 'execute')
+
+
+if __name__ == "__main__":
+    # Run tests directly
+    pytest.main([__file__, "-v"])

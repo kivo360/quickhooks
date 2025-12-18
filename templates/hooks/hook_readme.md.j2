@@ -1,0 +1,248 @@
+# {{ hook_name | title }} Hook
+
+## Description
+
+{{ description }}
+
+## Hook Type
+
+**Type:** {{ hook_type | title }}
+**Category:** {{ category | title }}
+**Target Tool:** {{ target_tool }}
+
+## Key Features
+
+{% for feature in features %}
+- {{ feature }}
+{% endfor %}
+
+## Installation and Setup
+
+1. Ensure the hook file is executable:
+   ```bash
+   chmod +x {{ hook_name }}.py
+   ```
+
+2. Test the hook:
+   ```bash
+   echo '{"test_field": "test_value"}' | python {{ hook_name }}.py
+   ```
+
+## Usage
+
+### Basic Usage
+
+```bash
+# Pipe JSON input to the hook
+echo '{"field": "value"}' | {{ hook_name }}.py
+```
+
+### With Claude Code
+
+Add this hook to your Claude Code settings.json:
+
+```json
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "name": "{{ hook_name }}",
+        "path": "/path/to/{{ hook_name }}.py"
+      }
+    ]
+  }
+}
+```
+
+## Input Schema
+
+The hook expects JSON input with the following structure:
+
+```json
+{
+  {% for field in input_fields %}
+  "{{ field.name }}": {{ field.type | lower }}{% if not field.required %} (optional){% endif %} - {{ field.description }}
+  {% endfor %}
+}
+```
+
+### Example Input
+
+```json
+{{ example_input | default({'test_field': 'example_value'}) | tojson(indent=2) }}
+```
+
+## Output Schema
+
+The hook returns JSON output with the following structure:
+
+```json
+{
+  {% if hook_type == 'validator' %}
+  "status": "success|failed|error",
+  "allowed": boolean,
+  "data": object,
+  "message": string,
+  "validation_errors": array
+  {% elif hook_type == 'transformer' %}
+  "status": "success|error",
+  "data": object,
+  "message": string,
+  "transformations": array
+  {% elif hook_type == 'analyzer' %}
+  "status": "success|failed|error",
+  "allowed": boolean,
+  "data": object,
+  "message": string,
+  "next_actions": array,
+  "metadata": object
+  {% else %}
+  "status": "success|error",
+  "message": string,
+  "data": object
+  {% endif %}
+}
+```
+
+## Examples
+
+{% for example in examples %}
+### {{ loop.index }}. {{ example.title | default('Example ' + loop.index|string) }}
+
+{{ example.description }}
+
+**Input:**
+```json
+{{ example.input | tojson(indent=2) }}
+```
+
+**Output:**
+```json
+{{ example.output | default({'status': 'success', 'message': 'Operation completed'}) | tojson(indent=2) }}
+```
+
+{% endfor %}
+
+## Validation Rules
+
+{% if hook_type == 'validator' %}
+{% for rule in validation_rules %}
+- **{{ rule.name }}**: {{ rule.description }}
+  - Example: {{ rule.example }}
+  - Error: {{ rule.error_message }}
+{% endfor %}
+{% endif %}
+
+## Transformation Rules
+
+{% if hook_type == 'transformer' %}
+{% for rule in transformation_rules %}
+- **{{ rule.name }}**: {{ rule.description }}
+  - Input Type: {{ rule.input_type }}
+  - Example: {{ rule.example }}
+{% endfor %}
+{% endif %}
+
+## Analysis Aspects
+
+{% if hook_type == 'analyzer' %}
+{% for aspect in analysis_aspects %}
+- **{{ aspect.name }}**: {{ aspect.description }}
+  - Trigger: {{ aspect.trigger }}
+  - Action: {{ aspect.action }}
+{% endfor %}
+{% endif %}
+
+## Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+pytest test_{{ hook_name }}.py -v
+
+# Run specific test
+pytest test_{{ hook_name }}.py::Test{{ class_name }}::test_basic_execution -v
+```
+
+## Configuration
+
+The hook can be configured through:
+
+1. **Environment Variables:**
+   ```bash
+   export {{ hook_name | upper }}_CONFIG_FILE="/path/to/config.json"
+   ```
+
+2. **Command-line Arguments:**
+   ```bash
+   {{ hook_name }}.py --help
+   ```
+
+## Error Handling
+
+The hook provides comprehensive error handling:
+
+- **Input Validation Errors**: Returns structured error messages
+- **Processing Errors**: Graceful degradation with informative messages
+- **System Errors**: Detailed error information for debugging
+
+## Performance
+
+- **Execution Time**: Typically < 100ms for standard operations
+- **Memory Usage**: Minimal footprint with streaming processing
+- **Concurrency**: Supports concurrent execution
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Permission Denied**: Ensure the hook file is executable
+   ```bash
+   chmod +x {{ hook_name }}.py
+   ```
+
+2. **Module Not Found**: Install dependencies with uv
+   ```bash
+   uv run -s {{ hook_name }}.py
+   ```
+
+3. **Invalid JSON**: Ensure input is valid JSON format
+
+### Debug Mode
+
+Enable debug output:
+
+```bash
+export DEBUG=1
+echo '{"test": "value"}' | {{ hook_name }}.py
+```
+
+## Contributing
+
+To modify this hook:
+
+1. Understand the hook type and target tool
+2. Modify the `execute` method as needed
+3. Update tests accordingly
+4. Test with various input scenarios
+
+## Version History
+
+- **v1.0.0**: Initial release
+  - Basic {{ hook_type }} functionality
+  - {{ target_tool }} integration
+  - Comprehensive error handling
+
+## Support
+
+For issues or questions:
+
+1. Check the troubleshooting section
+2. Review test cases for usage examples
+3. Enable debug mode for detailed logging
+4. Consult the Claude Code documentation for hook integration
+
+---
+
+*Generated on {{ timestamp }} by QuickHooks*

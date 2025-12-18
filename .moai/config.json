@@ -1,0 +1,122 @@
+{
+  "project": {
+    "name": "quickhooks",
+    "description": "Streamlined TDD framework for Claude Code hooks with AI-powered agent analysis and Agent OS integration",
+    "version": "0.21.2",
+    "mode": "personal",
+    "locale": "en",
+    "language": "generic",
+    "language_detection": {
+      "detected_language": "generic",
+      "detection_method": "cli_default",
+      "confidence": null,
+      "markers": [],
+      "confirmed_by": null
+    },
+    "optimized": false
+  },
+  "language": {
+    "conversation_language": "en",
+    "conversation_language_name": "English"
+  },
+  "user": {
+    "github_username": "kivo360",
+    "email": "kivo360@gmail.com",
+    "name": "Kevin Hill",
+    "timezone": "America/Sao_Paulo"
+  },
+  "git_strategy": {
+    "personal": {
+      "enabled": true,
+      "branch_prefix": "feature/",
+      "commit_style": "conventional",
+      "auto_push": false
+    },
+    "team": {
+      "enabled": false,
+      "use_gitflow": true,
+      "develop_branch": "develop",
+      "require_pr": false,
+      "pr_base_branch": "develop",
+      "auto_merge": false
+    }
+  },
+  "reporting": {
+    "enabled": true,
+    "auto_create": false,
+    "format": "markdown",
+    "output_dir": ".moai/reports",
+    "include_changelog": true,
+    "include_metrics": true
+  },
+  "tags": {
+    "enabled": true,
+    "auto_tag": true,
+    "enforce_linkage": true,
+    "tag_prefix": "@"
+  },
+  "trust_principles": {
+    "test_first": {
+      "enabled": true,
+      "min_coverage": 80,
+      "require_tests_before_code": true
+    },
+    "readable": {
+      "enabled": true,
+      "enforce_naming_conventions": true,
+      "require_documentation": true
+    },
+    "unified": {
+      "enabled": true,
+      "enforce_style_guide": true,
+      "auto_format": true
+    },
+    "secured": {
+      "enabled": true,
+      "scan_dependencies": true,
+      "require_env_vars": true
+    },
+    "trackable": {
+      "enabled": true,
+      "require_commit_messages": true,
+      "link_commits_to_tags": true
+    }
+  },
+  "workflows": {
+    "spec_first": true,
+    "tdd_cycle": {
+      "red": true,
+      "green": true,
+      "refactor": true
+    },
+    "auto_sync": false,
+    "require_approval": true
+  },
+  "paths": {
+    "project_root": "/Users/kevinhill/Coding/Tooling/ClaudeCode/quickhooks",
+    "docs_dir": ".moai/project",
+    "reports_dir": ".moai/reports",
+    "temp_dir": ".moai/temp"
+  },
+  "integrations": {
+    "github": {
+      "enabled": true,
+      "repo": "kivo360/quickhooks",
+      "default_branch": "main"
+    },
+    "claude_code": {
+      "enabled": true,
+      "settings_path": ".claude/settings.json"
+    },
+    "mcp_servers": {
+      "enabled": true,
+      "config_path": ".mcp.json"
+    }
+  },
+  "metadata": {
+    "created_at": "2025-01-08T00:00:00Z",
+    "updated_at": "2025-01-08T00:00:00Z",
+    "config_version": "4.0.0",
+    "initialized_by": "project-manager"
+  }
+}

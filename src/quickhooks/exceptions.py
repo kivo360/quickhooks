@@ -4,6 +4,7 @@ This module defines all custom exceptions used throughout the QuickHooks
 framework for better error handling and debugging.
 """
 
+import json
 from typing import Any
 
 
@@ -379,7 +380,7 @@ def handle_exception(exception: Exception) -> QuickHooksError:
 
     # For other exceptions, wrap in generic QuickHooksError
     return QuickHooksError(
-        f"Unexpected error: {str(exception)}",
+        f"Unexpected error: {exception!s}",
         error_code="UNEXPECTED_ERROR",
         context={"original_type": type(exception).__name__},
     )
@@ -401,7 +402,7 @@ def format_exception_chain(exception: Exception) -> str:
                 for key, value in current.context.items():
                     lines.append(f"{indent}  {key}: {value}")
         else:
-            lines.append(f"{indent}{type(current).__name__}: {str(current)}")
+            lines.append(f"{indent}{type(current).__name__}: {current!s}")
 
         current = current.__cause__ if hasattr(current, "__cause__") else None
         level += 1
@@ -420,14 +421,13 @@ def get_error_summary(exception: Exception) -> dict[str, Any]:
             "context": exception.context,
             "recoverable": _is_recoverable_error(exception),
         }
-    else:
-        return {
-            "error_type": type(exception).__name__,
-            "error_code": "EXTERNAL_ERROR",
-            "message": str(exception),
-            "context": {},
-            "recoverable": False,
-        }
+    return {
+        "error_type": type(exception).__name__,
+        "error_code": "EXTERNAL_ERROR",
+        "message": str(exception),
+        "context": {},
+        "recoverable": False,
+    }
 
 
 def _is_recoverable_error(exception: QuickHooksError) -> bool:

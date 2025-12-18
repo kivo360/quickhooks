@@ -1,4 +1,4 @@
-"""QuickHooks - A streamlined TDD framework for Claude Code hooks with real-time feedback.
+"""QuickHooks - A streamlined TDD framework for Claude Code hooks.
 
 This package provides a framework for developing and testing Claude Code hooks with
 a focus on test-driven development and developer experience.
@@ -9,7 +9,7 @@ from pathlib import Path
 from rich.console import Console
 
 # Version of quickhooks
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Export main components
 from .core import (
@@ -36,33 +36,33 @@ from .hooks import (
 from .visualization import MermaidWorkflowGenerator
 
 __all__ = [
-    "__version__",
-    "quickhooks_path",
-    "hello",
+    # Hook classes
+    "BaseHook",
+    "DataParallelHook",
     # Core execution
     "ExecutionError",
     "ExecutionResult",
+    "HookExecutionError",
     "HookExecutor",
-    "PreToolUseInput",
-    # Parallel processing
-    "ParallelProcessor",
-    "ProcessingTask",
-    "ProcessingResult",
-    "ProcessingMode",
-    "ProcessingPriority",
-    # Hook classes
-    "BaseHook",
-    "ParallelHook",
-    "MultiHookProcessor",
-    "DataParallelHook",
-    "PipelineHook",
     # Visualization
     "MermaidWorkflowGenerator",
+    "MultiHookProcessor",
+    "ParallelHook",
+    # Parallel processing
+    "ParallelProcessor",
+    "PipelineHook",
+    "PreToolUseInput",
+    "ProcessingError",
+    "ProcessingMode",
+    "ProcessingPriority",
+    "ProcessingResult",
+    "ProcessingTask",
     # Exceptions
     "QuickHooksError",
-    "HookExecutionError",
-    "ProcessingError",
     "ValidationError",
+    "__version__",
+    "hello",
+    "quickhooks_path",
 ]
 
 # Path to the package root
@@ -75,9 +75,9 @@ console = Console()
 def print_banner() -> None:
     """Print the QuickHooks banner."""
     banner = """
-    [38;5;39m╔═╗╦ ╦╦═╗╦ ╦╔═╗╦ ╦╔╗╔╔═╗╔╦╗╔═╗╦  ╔═╗
+    \x1b[38;5;39m╔═╗╦ ╦╦═╗╦ ╦╔═╗╦ ╦╔╗╔╔═╗╔╦╗╔═╗╦  ╔═╗
     ╠╣ ║ ║╠╦╝║║║╠═╝╠═╣║║║╠╣  ║ ║ ║║  ╠╣
-    ╚  ╚═╝╩╚═╚╩╝╩  ╩ ╩╝╚╝╚   ╩ ╚═╝╩  ╚  [0m
+    ╚  ╚═╝╩╚═╚╩╝╩  ╩ ╩╝╚╝╚   ╩ ╚═╝╩  ╚  \x1b[0m
     """
     console.print(banner)
     console.print(f"[bold blue]QuickHooks v{__version__}[/bold blue]")

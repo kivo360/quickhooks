@@ -147,11 +147,10 @@ class GrepToRipgrepTransformer:
                         if flag in ["-r", "-R"]:
                             # Recursive is default in rg, skip
                             continue
-                        elif flag == "-E":
+                        if flag == "-E":
                             # Extended regex is default in rg
                             continue
-                        else:
-                            rg_flags.append(flag)
+                        rg_flags.append(flag)
                 i += 1
                 continue
 
@@ -316,7 +315,7 @@ def main():
 
     except Exception as e:
         # Always fail-safe - log error but don't block execution
-        print(f"Grep transformer hook error: {str(e)}", file=sys.stderr)
+        print(f"Grep transformer hook error: {e!s}", file=sys.stderr)
         # Exit code 0 allows tool to proceed
         sys.exit(0)
 

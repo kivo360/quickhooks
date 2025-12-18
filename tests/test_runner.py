@@ -92,10 +92,12 @@ class TestTestRunner:
         """Test discovering test files."""
         # This test will depend on the actual file structure
         # For now, we'll just check that it returns a list
-        with patch.object(runner.test_directory, "exists", return_value=True):
-            with patch.object(runner.test_directory, "glob", return_value=[]):
-                tests = runner.discover_tests()
-                assert isinstance(tests, list)
+        with (
+            patch.object(runner.test_directory, "exists", return_value=True),
+            patch.object(runner.test_directory, "glob", return_value=[]),
+        ):
+            tests = runner.discover_tests()
+            assert isinstance(tests, list)
 
     @pytest.mark.asyncio
     async def test_run_test_case_success(self, runner):

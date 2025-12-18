@@ -22,8 +22,6 @@ class ExecutionError(Exception):
     and any other execution-related issues.
     """
 
-    pass
-
 
 class PreToolUseInput(BaseModel):
     """Input data structure for pre-tool-use hooks.
@@ -77,6 +75,27 @@ class HookExecutor:
         """
         self.default_timeout = default_timeout
 
+    def _is_pep723_hook(self, hook_path: Path) -> bool:
+        """Check if a hook script uses PEP 723 inline script metadata.
+
+        Args:
+            hook_path: Path to the hook script
+
+        Returns:
+            bool: True if the script contains PEP 723 metadata
+        """
+        try:
+            with open(hook_path, encoding="utf-8") as f:
+                # Read first 20 lines to check for PEP 723 marker
+                for i, line in enumerate(f):
+                    if i >= 20:
+                        break
+                    if "# /// script" in line:
+                        return True
+            return False
+        except (OSError, UnicodeDecodeError):
+            return False
+
     async def execute(
         self,
         hook_script: str | Path,
@@ -99,10 +118,12 @@ class HookExecutor:
         """
         hook_path = Path(hook_script)
         if not hook_path.exists():
-            raise FileNotFoundError(f"Hook script not found: {hook_path}")
+            msg = f"Hook script not found: {hook_path}"
+            raise FileNotFoundError(msg)
 
         if not hook_path.is_file():
-            raise ExecutionError(f"Hook path is not a file: {hook_path}")
+            msg = f"Hook path is not a file: {hook_path}"
+            raise ExecutionError(msg)
 
         execution_timeout = timeout or self.default_timeout
         start_time = time.perf_counter()
@@ -111,10 +132,31 @@ class HookExecutor:
             # Prepare JSON input
             json_input = json.dumps(input_data).encode("utf-8")
 
+            # Check if this is a PEP 723 hook
+            is_pep723 = self._is_pep723_hook(hook_path)
+
+            # Determine execution command
+            if is_pep723:
+                # Use uv run -s for PEP 723 hooks
+                cmd = ["uv", "run", "-s", str(hook_path)]
+            else:
+                # Check if shebang indicates uv run -s
+                try:
+                    with open(hook_path, encoding="utf-8") as f:
+                        first_line = f.readline().strip()
+                        if "uv run -s" in first_line:
+                            # Use shebang execution (let system handle it)
+                            cmd = [str(hook_path)]
+                        else:
+                            # Default to python
+                            cmd = ["python", str(hook_path)]
+                except (OSError, UnicodeDecodeError):
+                    # Fallback to python if we can't read the file
+                    cmd = ["python", str(hook_path)]
+
             # Start the subprocess
             process = await asyncio.create_subprocess_exec(
-                "python",
-                str(hook_path),
+                *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -153,16 +195,16 @@ class HookExecutor:
                     pass  # Process already terminated
 
                 duration = time.perf_counter() - start_time
-                raise ExecutionError(
-                    f"Hook execution timed out after {execution_timeout:.1f} seconds"
-                )
+                msg = f"Hook execution timed out after {execution_timeout:.1f} seconds"
+                raise ExecutionError(msg)
 
         except ExecutionError:
             # Re-raise execution errors as-is
             raise
         except Exception as e:
             duration = time.perf_counter() - start_time
-            raise ExecutionError(f"Hook execution failed: {str(e)}") from e
+            msg = f"Hook execution failed: {e!s}"
+            raise ExecutionError(msg) from e
 
     def _parse_json_output(self, stdout: str) -> dict[str, Any]:
         """Parse JSON output from hook stdout.
@@ -197,10 +239,8 @@ class HookExecutor:
                         continue
 
             # If no valid JSON found, treat as error
-            raise ExecutionError(
-                f"Invalid JSON output from hook: {str(e)}\n"
-                f"Raw output: {stdout[:200]}..."
-            ) from e
+            msg = f"Invalid JSON output from hook: {e!s}\nRaw output: {stdout[:200]}..."
+            raise ExecutionError(msg) from e
 
     async def execute_with_context(
         self,
@@ -275,6 +315,9 @@ class HookExecutor:
                     "class ",
                     "if __name__",
                     "#!/usr/bin/env python",
+                    "#!/usr/bin/env -S uv run -s",
+                    "#!/usr/bin/env uv run -s",
+                    "# /// script",  # PEP 723 marker
                     "# -*- coding:",
                 ]
 

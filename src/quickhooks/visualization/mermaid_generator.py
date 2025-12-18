@@ -101,14 +101,14 @@ class MermaidWorkflowGenerator:
 
         if mode == ProcessingMode.SEQUENTIAL:
             return self._generate_sequential_flow(tasks, title)
-        elif mode == ProcessingMode.PARALLEL:
+        if mode == ProcessingMode.PARALLEL:
             return self._generate_parallel_flow(tasks, title)
-        elif mode == ProcessingMode.PIPELINE:
+        if mode == ProcessingMode.PIPELINE:
             return self._generate_pipeline_flow(tasks, title)
-        elif mode == ProcessingMode.BATCH:
+        if mode == ProcessingMode.BATCH:
             return self._generate_batch_flow(tasks, title)
-        else:
-            raise ValueError(f"Unknown processing mode: {mode}")
+        msg = f"Unknown processing mode: {mode}"
+        raise ValueError(msg)
 
     def _generate_sequential_flow(self, tasks: list[ProcessingTask], title: str) -> str:
         """Generate sequential processing flow."""
@@ -276,9 +276,7 @@ class MermaidWorkflowGenerator:
                 # For other formats, just save the source
                 output_path = mmd_path
 
-        except Exception as e:
-            print(f"Warning: Could not render diagram to {format}: {e}")
-            print(f"Mermaid source saved to: {mmd_path}")
+        except Exception:
             output_path = mmd_path
 
         return output_path

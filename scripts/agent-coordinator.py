@@ -28,7 +28,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 import yaml
 from pydantic import BaseModel
 from rich.console import Console
@@ -165,22 +166,21 @@ class Agent:
                         self.successful_tasks += 1
                         self.logger.info(f"Task {task.id} completed successfully")
                         break
+                    if attempt < task.retries - 1:
+                        self.logger.warning(
+                            f"Task {task.id} failed (attempt {attempt + 1}/{task.retries}), "
+                            f"retrying in {task.retry_delay}s"
+                        )
+                        await asyncio.sleep(task.retry_delay)
                     else:
-                        if attempt < task.retries - 1:
-                            self.logger.warning(
-                                f"Task {task.id} failed (attempt {attempt + 1}/{task.retries}), "
-                                f"retrying in {task.retry_delay}s"
-                            )
-                            await asyncio.sleep(task.retry_delay)
-                        else:
-                            result.status = AgentStatus.FAILED
-                            result.error_message = (
-                                f"Command failed with return code {process.returncode}"
-                            )
-                            self.failed_tasks += 1
-                            self.logger.error(
-                                f"Task {task.id} failed after {task.retries} attempts"
-                            )
+                        result.status = AgentStatus.FAILED
+                        result.error_message = (
+                            f"Command failed with return code {process.returncode}"
+                        )
+                        self.failed_tasks += 1
+                        self.logger.error(
+                            f"Task {task.id} failed after {task.retries} attempts"
+                        )
 
                 except TimeoutError:
                     if attempt < task.retries - 1:
@@ -497,18 +497,18 @@ class AgentCoordinator:
         }
 
 
-app = typer.Typer(help="QuickHooks Agent Coordinator")
+app = cyclopts.App(help="QuickHooks Agent Coordinator")
 
 
-@app.command()
+@app.command
 def orchestrate(
-    config: Path | None = typer.Option(  # noqa: B008
+    config: Path | None = Parameter(
         None, "--config", "-c", help="Configuration file path"
     ),
-    monitor: bool = typer.Option(
+    monitor: bool = Parameter(
         False, "--monitor", "-m", help="Enable real-time monitoring"
     ),
-    output_format: str = typer.Option(
+    output_format: str = Parameter(
         "table", "--format", "-f", help="Output format (table|json)"
     ),
 ):
@@ -615,14 +615,14 @@ def orchestrate(
         )
 
 
-@app.command()
+@app.command
 def status():
     """Show current agent coordinator status."""
     coordinator = AgentCoordinator()
     console.print(coordinator.create_status_display())
 
 
-@app.command()
+@app.command
 def build():
     """Run build tasks using agent coordination."""
 
@@ -671,7 +671,7 @@ def build():
     sys.exit(0 if success else 1)
 
 
-@app.command()
+@app.command
 def test():
     """Run test tasks using agent coordination."""
 

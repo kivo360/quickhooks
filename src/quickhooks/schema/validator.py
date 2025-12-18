@@ -45,7 +45,7 @@ class ClaudeSettingsValidator:
                 errors.append(f"  At path: {' -> '.join(str(p) for p in e.path)}")
             return False, errors
         except Exception as e:
-            return False, [f"Validation failed: {str(e)}"]
+            return False, [f"Validation failed: {e!s}"]
 
     def validate_hook_configuration(
         self, hooks_config: dict[str, Any]
@@ -91,13 +91,15 @@ class ClaudeSettingsValidator:
             "SubagentStop",
             "PreCompact",
         ]:
-            raise ValueError(f"Invalid hook type: {hook_type}")
+            msg = f"Invalid hook type: {hook_type}"
+            raise ValueError(msg)
 
         hook_command = {"type": "command", "command": command}
 
         if timeout is not None:
             if timeout <= 0:
-                raise ValueError("Timeout must be greater than 0")
+                msg = "Timeout must be greater than 0"
+                raise ValueError(msg)
             hook_command["timeout"] = timeout
 
         hook_matcher = {"hooks": [hook_command]}
@@ -150,14 +152,14 @@ class ClaudeSettingsValidator:
         invalid_tools = [tool for tool in tools if tool not in valid_tools]
 
         if invalid_tools:
-            raise ValueError(f"Invalid tools for matcher: {invalid_tools}")
+            msg = f"Invalid tools for matcher: {invalid_tools}"
+            raise ValueError(msg)
 
         if len(tools) == 1:
             return tools[0]
-        elif len(tools) == len(valid_tools):
+        if len(tools) == len(valid_tools):
             return "*"  # Match all tools
-        else:
-            return "|".join(tools)
+        return "|".join(tools)
 
 
 def validate_claude_settings_file(file_path: Path) -> tuple[bool, list[str]]:

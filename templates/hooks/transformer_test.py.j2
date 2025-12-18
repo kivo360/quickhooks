@@ -1,0 +1,136 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+#     "pytest>=7.0.0",
+#     "pytest-asyncio>=0.21.0",
+# ]
+# ///
+"""
+Test suite for {{ class_name }} transformer hook.
+
+This test suite validates that the {{ class_name }} hook correctly
+transforms input data according to specified rules.
+"""
+
+import asyncio
+import json
+import pytest
+from typing import Any, Dict
+
+# Import the hook to test
+from {{ hook_name }} import {{ class_name }}, {{ class_name }}Input
+
+
+class Test{{ class_name }}:
+    """Test cases for {{ class_name }} transformer hook."""
+
+    @pytest.fixture
+    def transformer(self):
+        """Create {{ class_name }} transformer instance."""
+        return {{ class_name }}()
+
+    {% for test in test_cases %}
+    @pytest.mark.asyncio
+    async def test_{{ test.name }}(self, transformer):
+        """Test case: {{ test.description }}"""
+
+        # Prepare test input
+        test_input = {{ class_name }}Input(**{{ test.input }})
+
+        # Execute transformer
+        result = await transformer.execute(test_input)
+
+        # Assert results
+        assert result.status == "success"
+        assert result.data is not None
+        assert "transformed" in result.data
+
+        {% if test.expected_transformations %}
+        # Verify specific transformations were applied
+        for transformation in {{ test.expected_transformations }}:
+            assert transformation in result.transformations
+        {% endif %}
+
+        # Verify message
+        assert "completed successfully" in result.message.lower()
+
+    {% endfor %}
+
+    @pytest.mark.asyncio
+    async def test_transformation_with_empty_data(self, transformer):
+        """Test transformation behavior with minimal data."""
+
+        minimal_input = {{ class_name }}Input(**{{ minimal_test_input | default({'test_field': ''}) }})
+
+        result = await transformer.execute(minimal_input)
+
+        # Should handle gracefully
+        assert result.status == "success"
+        assert result.data is not None
+
+    @pytest.mark.asyncio
+    async def test_transformation_error_handling(self, transformer):
+        """Test error handling in transformer."""
+
+        # Test with data that might cause exceptions
+        problematic_input = {{ class_name }}Input(**{{ error_test_input | default({'test_field': None}) }})
+
+        result = await transformer.execute(problematic_input)
+
+        # Should handle errors gracefully
+        assert result.status == "error"
+        assert result.data == {}
+        assert len(result.transformations) == 0
+
+    @pytest.mark.asyncio
+    async def test_transformation_idempotency(self, transformer):
+        """Test that transformations are idempotent when applicable."""
+
+        original_input = {{ class_name }}Input(**{{ idempotency_test_input | default({'test_field': 'test_value'}) }})
+
+        # Apply transformation twice
+        first_result = await transformer.execute(original_input)
+        second_input = {{ class_name }}Input(**first_result.data.get("transformed", {}))
+        second_result = await transformer.execute(second_input)
+
+        # Results should be consistent
+        assert first_result.status == "success"
+        assert second_result.status == "success"
+
+    @pytest.mark.asyncio
+    async def test_transformer_integration(self, transformer):
+        """Test transformer integration with JSON input/output."""
+
+        # Test JSON input validation (simulating hook input)
+        json_input = """{{ integration_test_input | default({'test_field': 'test_value'}) | tojson }}"""
+
+        # Parse and transform
+        input_data = json.loads(json_input)
+        test_input = {{ class_name }}Input(**input_data)
+
+        result = await transformer.execute(test_input)
+
+        # Verify output is serializable
+        output_json = json.dumps(result.model_dump())
+        assert json.loads(output_json)  # Should not raise exception
+
+        # Verify transformation tracking
+        assert isinstance(result.transformations, list)
+
+    def test_transformer_configuration(self):
+        """Test transformer initialization and configuration."""
+
+        transformer = {{ class_name }}()
+
+        # Verify transformer is properly initialized
+        assert transformer is not None
+        assert hasattr(transformer, 'execute')
+        assert hasattr(transformer, '_apply_transformation_rules')
+
+
+if __name__ == "__main__":
+    # Run tests directly
+    pytest.main([__file__, "-v"])

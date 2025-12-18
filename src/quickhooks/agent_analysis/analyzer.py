@@ -6,7 +6,8 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.fireworks import FireworksProvider
 
-from ..config import get_config
+from quickhooks.config import get_config
+
 from .agent_discovery import AgentDiscovery
 from .context_manager import ContextManager
 from .types import (
@@ -18,7 +19,10 @@ from .types import (
 
 
 class AgentAnalyzer:
-    """Analyzes prompts to determine appropriate agent usage with Pydantic AI and Fireworks AI."""
+    """Analyzes prompts to determine appropriate agent usage.
+
+    Uses Pydantic AI and Fireworks AI for analysis.
+    """
 
     def __init__(
         self,
@@ -32,7 +36,8 @@ class AgentAnalyzer:
 
         Args:
             api_key: Fireworks API key (uses FIREWORKS_API_KEY env var if not provided)
-            model_name: Fireworks model to use for analysis (uses FIREWORKS_LLM env var if not provided)
+            model_name: Fireworks model to use for analysis
+                (uses FIREWORKS_LLM env var if not provided)
             base_url: Fireworks API base URL (uses config default if not provided)
             enable_agent_discovery: Whether to enable discovery of local agents
         """
@@ -42,9 +47,8 @@ class AgentAnalyzer:
         # Use provided values or fall back to config/env
         api_key = api_key or config.ai.api_key or os.getenv("FIREWORKS_API_KEY")
         if not api_key:
-            raise ValueError(
-                "FIREWORKS_API_KEY environment variable must be set or api_key must be provided"
-            )
+            msg = "FIREWORKS_API_KEY environment variable must be set or api_key must be provided"
+            raise ValueError(msg)
 
         model_name = model_name or config.ai.llm
 
@@ -153,8 +157,8 @@ Focus on practical, actionable recommendations that would genuinely help with th
                     )
                     for agent in relevant_agents
                 ]
-            except Exception as e:
-                print(f"Warning: Agent discovery failed: {e}")
+            except Exception:
+                pass
 
         # Manage context chunking
         context_chunks = self.context_manager.chunk_context(
@@ -218,8 +222,8 @@ Focus on practical, actionable recommendations that would genuinely help with th
                     )
                     for agent in relevant_agents
                 ]
-            except Exception as e:
-                print(f"Warning: Agent discovery failed: {e}")
+            except Exception:
+                pass
 
         # Manage context chunking
         context_chunks = self.context_manager.chunk_context(
@@ -248,7 +252,7 @@ Focus on practical, actionable recommendations that would genuinely help with th
         self,
         request: AgentAnalysisRequest,
         context_chunks: list,
-        discovered_agents: list[DiscoveredAgentInfo] = None,
+        discovered_agents: list[DiscoveredAgentInfo] | None = None,
     ) -> str:
         """Build the analysis prompt from request and context chunks."""
         prompt_parts = [

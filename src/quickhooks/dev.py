@@ -10,11 +10,13 @@ import asyncio
 import contextlib
 import logging
 import signal
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TypeVar
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
@@ -22,6 +24,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from watchfiles import Change, awatch
 
+console = Console()
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -195,15 +198,15 @@ async def run_dev_server(
 
 def dev_cli() -> None:
     """CLI entry point for the development server."""
-    app = typer.Typer(help="Development server with hot-reload")
+    app = cyclopts.App(help="Development server with hot-reload")
 
-    @app.command()
+    @app.command
     def run(
-        path: str = typer.Argument(
+        path: str = Parameter(
             ".",
             help="Path to watch for changes (file or directory)",
         ),
-        delay: float = typer.Option(
+        delay: float = Parameter(
             0.5,
             "--delay",
             "-d",
@@ -213,8 +216,8 @@ def dev_cli() -> None:
         """Run the development server with hot-reload."""
         watch_path = Path(path).absolute()
         if not watch_path.exists():
-            typer.echo(f"Error: Path {watch_path} does not exist", err=True)
-            raise typer.Exit(1)
+            console.print(f"Error: Path {watch_path} does not exist", style="red")
+            sys.exit(1)
 
         async def target():
             console = Console()

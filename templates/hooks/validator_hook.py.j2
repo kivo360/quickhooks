@@ -1,0 +1,203 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+#     "jsonschema>=4.25.0",
+# ]
+# ///
+"""
+{{ description }}
+
+{{ capabilities | join(', ') | title }}
+"""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Any, Dict, List
+
+from pydantic import BaseModel, Field, ValidationError
+from jsonschema import validate as json_validate
+
+
+class {{ class_name }}Input(BaseModel):
+    """Input schema for {{ class_name }} validator hook."""
+
+    {% for field in input_fields %}
+    {{ field.name }}: {{ field.type }} = Field(
+        {% if field.required %}...{% else %}{{ field.default }}{% endif %},
+        description="{{ field.description }}"
+    )
+    {% endfor %}
+
+
+class {{ class_name }}Output(BaseModel):
+    """Output schema for {{ class_name }} validator hook."""
+
+    status: str = Field(..., description="Execution status")
+    allowed: bool = Field(..., description="Whether the input is allowed")
+    data: Dict[str, Any] = Field(default_factory=dict, description="Validated data")
+    message: str = Field(..., description="Status message")
+    validation_errors: List[str] = Field(default_factory=list, description="List of validation errors")
+
+
+class {{ class_name }}:
+    """{{ class_name }} validator hook for QuickHooks.
+
+    {{ description }}
+    """
+
+    def __init__(self):
+        """Initialize the validator hook."""
+        pass
+
+    def _validate_schema(self, data: Any) -> tuple[bool, List[str]]:
+        """Validate data against JSON schema.
+
+        Args:
+            data: Data to validate
+
+        Returns:
+            Tuple of (is_valid, error_messages)
+        """
+        try:
+            # Define schema for validation
+            schema = {
+                "type": "object",
+                "properties": {
+                    {% for field in input_fields %}
+                    "{{ field.name }}": {
+                        "type": "{{ field.json_type }}",
+                        "description": "{{ field.description }}"
+                    },
+                    {% endfor %}
+                },
+                "required": [
+                    {% for field in input_fields %}
+                    {% if field.required %}
+                    "{{ field.name }}",
+                    {% endif %}
+                    {% endfor %}
+                ]
+            }
+
+            json_validate(data, schema)
+            return True, []
+
+        except Exception as e:
+            return False, [f"Schema validation failed: {str(e)}"]
+
+    def _validate_business_rules(self, data: Any) -> tuple[bool, List[str]]:
+        """Validate data against business rules.
+
+        Args:
+            data: Data to validate
+
+        Returns:
+            Tuple of (is_valid, error_messages)
+        """
+        errors = []
+
+        # Apply validation rules
+        {% for rule in validation_rules %}
+        # {{ rule.description }}
+        try:
+            {% if rule.condition %}
+            # {{ rule.example }}
+            pass  # TODO: Implement {{ rule.name }}
+            {% endif %}
+        except Exception as e:
+            errors.append(f"Rule validation error in {{ rule.name }}: {str(e)}")
+        {% endfor %}
+
+        return len(errors) == 0, errors
+
+    async def execute(self, input_data: {{ class_name }}Input) -> {{ class_name }}Output:
+        """Execute the {{ class_name }} validator hook.
+
+        Args:
+            input_data: The input data for the hook
+
+        Returns:
+            {{ class_name }}Output: The result of the validation
+        """
+        try:
+            # Extract data for validation
+            {% for field in input_fields %}
+            {% if field.name != 'metadata' %}
+            data_to_validate = input_data.{{ field.name }}
+            {% endif %}
+            {% endfor %}
+
+            # Validate schema
+            schema_valid, schema_errors = self._validate_schema(data_to_validate)
+            if not schema_valid:
+                return {{ class_name }}Output(
+                    status="failed",
+                    allowed=False,
+                    data={},
+                    message="Schema validation failed",
+                    validation_errors=schema_errors
+                )
+
+            # Validate business rules
+            rules_valid, rule_errors = self._validate_business_rules(data_to_validate)
+            if not rules_valid:
+                return {{ class_name }}Output(
+                    status="failed",
+                    allowed=False,
+                    data={},
+                    message="Business rule validation failed",
+                    validation_errors=rule_errors
+                )
+
+            # All validations passed
+            return {{ class_name }}Output(
+                status="success",
+                allowed=True,
+                data={"validated": data_to_validate},
+                message="{{ class_name }} validation passed successfully",
+                validation_errors=[]
+            )
+
+        except Exception as e:
+            return {{ class_name }}Output(
+                status="error",
+                allowed=False,
+                data={},
+                message=f"{{ class_name }} validation error: {str(e)}",
+                validation_errors=[f"Validation error: {str(e)}"]
+            )
+
+
+async def main():
+    """Main entry point for the validator hook."""
+    # Read input from stdin
+    input_json = sys.stdin.read()
+
+    try:
+        input_data = {{ class_name }}Input.model_validate_json(input_json)
+    except Exception as e:
+        error_output = {
+            "status": "error",
+            "allowed": False,
+            "data": {},
+            "message": f"Invalid input: {str(e)}",
+            "validation_errors": [f"Input validation error: {str(e)}"]
+        }
+        print(json.dumps(error_output, indent=2))
+        sys.exit(1)
+
+    # Create and run validator
+    validator = {{ class_name }}()
+    result = await validator.execute(input_data)
+
+    # Output result
+    print(json.dumps(result.model_dump(), indent=2))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

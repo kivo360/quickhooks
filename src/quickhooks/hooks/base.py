@@ -103,7 +103,6 @@ class BaseHook(ABC):
             Any exception that occurs during execution will be caught
             and converted to a failed HookOutput by the run method.
         """
-        pass
 
     async def validate_input(self, input_data: HookInput) -> bool:
         """Validate the input data before execution.
@@ -130,7 +129,6 @@ class BaseHook(ABC):
             input_data: The input data for the hook execution
             context: The execution context
         """
-        pass
 
     async def after_execute(
         self, input_data: HookInput, context: ExecutionContext, result: HookOutput
@@ -145,7 +143,6 @@ class BaseHook(ABC):
             context: The execution context
             result: The result from the execute method
         """
-        pass
 
     async def run(self, input_data: HookInput, context: ExecutionContext) -> HookResult:
         """Run the hook with full lifecycle management.
@@ -234,7 +231,7 @@ class BaseHook(ABC):
                 # Create error information
                 error = HookError(
                     code="EXECUTION_ERROR",
-                    message=f"Hook execution failed: {str(e)}",
+                    message=f"Hook execution failed: {e!s}",
                     details={
                         "exception_type": type(e).__name__,
                         "exception_args": e.args,
@@ -247,7 +244,7 @@ class BaseHook(ABC):
                     status=HookStatus.FAILED,
                     data={},
                     error=error,
-                    message=f"Hook execution failed: {str(e)}",
+                    message=f"Hook execution failed: {e!s}",
                     execution_time=execution_time,
                 )
 
@@ -259,7 +256,7 @@ class BaseHook(ABC):
             # Handle any unexpected exceptions in the lifecycle itself
             error = HookError(
                 code="LIFECYCLE_ERROR",
-                message=f"Hook lifecycle error: {str(e)}",
+                message=f"Hook lifecycle error: {e!s}",
                 details={
                     "exception_type": type(e).__name__,
                     "exception_args": e.args,
@@ -271,7 +268,7 @@ class BaseHook(ABC):
                 status=HookStatus.FAILED,
                 data={},
                 error=error,
-                message=f"Hook lifecycle error: {str(e)}",
+                message=f"Hook lifecycle error: {e!s}",
             )
 
             result.status = HookStatus.FAILED

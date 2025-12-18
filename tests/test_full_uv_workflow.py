@@ -48,7 +48,11 @@ def test_complete_workflow():
 
     try:
         result = subprocess.run(
-            [str(final_python), "--version"], capture_output=True, text=True, timeout=5
+            [str(final_python), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         if result.returncode == 0:
             print(f"   ✅ {result.stdout.strip()}")

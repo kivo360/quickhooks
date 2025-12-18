@@ -1,0 +1,234 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+# ]
+# ///
+"""
+{{ description }}
+
+{{ capabilities | join(', ') | title }}
+
+This pre-tool-use hook validates and potentially modifies tool inputs
+before they are executed by Claude Code.
+"""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class PreToolUseInput(BaseModel):
+    """Input schema for pre-tool-use hook."""
+
+    tool_name: str = Field(..., description="Name of the tool being called")
+    tool_input: Dict[str, Any] = Field(..., description="Input parameters for the tool")
+    context: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Additional context from the execution environment"
+    )
+
+
+class PreToolUseOutput(BaseModel):
+    """Output schema for pre-tool-use hook."""
+
+    allowed: bool = Field(..., description="Whether the tool call is allowed")
+    modified_input: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Modified input parameters (if any changes were made)"
+    )
+    message: str = Field(..., description="Status message")
+    warnings: List[str] = Field(default_factory=list, description="Warning messages")
+
+
+class {{ class_name }}:
+    """{{ class_name }} pre-tool-use hook for QuickHooks.
+
+    {{ description }}
+
+    This hook validates tool inputs and can modify them before execution.
+    """
+
+    def __init__(self):
+        """Initialize the pre-tool-use hook."""
+        self.target_tools = [{{ target_tools | map(lambda x: f'"{x}"') | join(', ') }}]
+
+    def _validate_tool_scope(self, tool_name: str) -> bool:
+        """Check if this hook should process the given tool.
+
+        Args:
+            tool_name: Name of the tool being called
+
+        Returns:
+            True if this hook should process the tool
+        """
+        return tool_name in self.target_tools or "*" in self.target_tools
+
+    def _validate_input_parameters(self, tool_name: str, tool_input: Dict[str, Any]) -> tuple[bool, List[str]]:
+        """Validate input parameters for the tool.
+
+        Args:
+            tool_name: Name of the tool
+            tool_input: Input parameters to validate
+
+        Returns:
+            Tuple of (is_valid, error_messages)
+        """
+        errors = []
+
+        {% for validation in tool_validations %}
+        # {{ validation.description }}
+        if tool_name == "{{ validation.tool }}" or "{{ validation.tool }}" == "*":
+            if "{{ validation.field }}" in tool_input:
+                value = tool_input["{{ validation.field }}"]
+                {% if validation.validation %}
+                if not {{ validation.validation }}:
+                    errors.append("{{ validation.error }}")
+                {% endif %}
+                {% endif %}
+        {% endfor %}
+
+        return len(errors) == 0, errors
+
+    def _apply_input_transformations(self, tool_name: str, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply transformations to input parameters.
+
+        Args:
+            tool_name: Name of the tool
+            tool_input: Input parameters to transform
+
+        Returns:
+            Modified input parameters
+        """
+        modified_input = tool_input.copy()
+
+        {% for transformation in input_transformations %}
+        # {{ transformation.description }}
+        if tool_name == "{{ transformation.tool }}" or "{{ transformation.tool }}" == "*":
+            if "{{ transformation.field }}" in modified_input:
+                {% if transformation.transformation %}
+                # {{ transformation.example }}
+                modified_input["{{ transformation.field }}"] = self._{{ transformation.transformation.replace('.', '_') }}(modified_input["{{ transformation.field }}"])
+                {% endif %}
+        {% endfor %}
+
+        return modified_input
+
+    def _{{ _security_filter }}(self, value: Any) -> Any:
+        """Apply security filtering to input values.
+
+        Args:
+            value: Value to filter
+
+        Returns:
+            Filtered value
+        """
+        if isinstance(value, str):
+            # Remove potentially dangerous patterns
+            dangerous_patterns = [
+                "rm -rf",
+                "sudo rm",
+                "delete",
+                "format",
+                "dd if="
+            ]
+            for pattern in dangerous_patterns:
+                if pattern in value:
+                    return value.replace(pattern, "[FILTERED]")
+        return value
+
+    def _{{ _format_validation_error }}(self, tool_name: str, errors: List[str]) -> str:
+        """Format validation error message.
+
+        Args:
+            tool_name: Name of the tool
+            errors: List of error messages
+
+        Returns:
+            Formatted error message
+        """
+        return f"Validation failed for {tool_name}: {'; '.join(errors)}"
+
+    async def execute(self, input_data: PreToolUseInput) -> PreToolUseOutput:
+        """Execute the pre-tool-use hook.
+
+        Args:
+            input_data: The input data for the hook
+
+        Returns:
+            PreToolUseOutput: The result of the hook execution
+        """
+        tool_name = input_data.tool_name
+        tool_input = input_data.tool_input
+
+        try:
+            # Check if this hook should process the tool
+            if not self._validate_tool_scope(tool_name):
+                return PreToolUseOutput(
+                    allowed=True,
+                    message=f"Hook does not process tool: {tool_name}"
+                )
+
+            # Validate input parameters
+            is_valid, errors = self._validate_input_parameters(tool_name, tool_input)
+            if not is_valid:
+                return PreToolUseOutput(
+                    allowed=False,
+                    message=self._format_validation_error(tool_name, errors)
+                )
+
+            # Apply input transformations
+            modified_input = self._apply_input_transformations(tool_name, tool_input)
+
+            # Check if input was modified
+            input_changed = modified_input != tool_input
+
+            return PreToolUseOutput(
+                allowed=True,
+                modified_input=modified_input if input_changed else None,
+                message=f"{{ class_name }} validated {tool_name} successfully"
+                + (" with modifications" if input_changed else ""),
+                warnings=[]
+            )
+
+        except Exception as e:
+            return PreToolUseOutput(
+                allowed=False,
+                message=f"{{ class_name }} error: {str(e)}",
+                warnings=[f"Error processing {tool_name}: {str(e)}"]
+            )
+
+
+async def main():
+    """Main entry point for the pre-tool-use hook."""
+    # Read input from stdin
+    input_json = sys.stdin.read()
+
+    try:
+        input_data = PreToolUseInput.model_validate_json(input_json)
+    except Exception as e:
+        error_output = {
+            "allowed": False,
+            "modified_input": None,
+            "message": f"Invalid input: {str(e)}",
+            "warnings": [f"Input validation error: {str(e)}"]
+        }
+        print(json.dumps(error_output, indent=2))
+        sys.exit(1)
+
+    # Create and run hook
+    hook = {{ class_name }}()
+    result = await hook.execute(input_data)
+
+    # Output result
+    print(json.dumps(result.model_dump(), indent=2))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

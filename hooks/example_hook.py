@@ -30,7 +30,7 @@ class ExampleHook(BaseHook):
             },
         )
 
-    async def validate_input(self, input_data: HookInput) -> bool:  # noqa: ARG002
+    async def validate_input(self, input_data: HookInput) -> bool:
         """Validate the input data.
 
         Args:
@@ -69,7 +69,7 @@ def main():
 
     except Exception as e:
         # Always fail-safe - log error but don't block execution
-        print(f"Example hook error: {str(e)}", file=sys.stderr)
+        print(f"Example hook error: {e!s}", file=sys.stderr)
         # Exit code 0 allows tool to proceed
         sys.exit(0)
 

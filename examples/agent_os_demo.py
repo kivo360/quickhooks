@@ -32,15 +32,17 @@ async def demo_instruction_execution():
 
         context = {
             "project_type": "web application",
-            "main_features": ["user authentication", "data visualization", "real-time updates"],
+            "main_features": [
+                "user authentication",
+                "data visualization",
+                "real-time updates",
+            ],
             "target_users": "data analysts and business users",
-            "tech_stack": ["Python", "FastAPI", "React", "PostgreSQL"]
+            "tech_stack": ["Python", "FastAPI", "React", "PostgreSQL"],
         }
 
         result = await executor.execute_instruction(
-            "plan-product",
-            category="core",
-            context=context
+            "plan-product", category="core", context=context
         )
 
         print(f"Status: {result.status.value}")
@@ -50,7 +52,7 @@ async def demo_instruction_execution():
     else:
         print("'plan-product' instruction not found")
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
 
 async def demo_workflow_execution():
@@ -76,25 +78,30 @@ async def demo_workflow_execution():
             "key_features": [
                 "Intelligent task prioritization",
                 "Team collaboration tools",
-                "Progress analytics dashboard"
+                "Progress analytics dashboard",
             ],
             "target_users": "Software development teams",
             "tech_preferences": ["Python", "React", "PostgreSQL", "Docker"],
-            "working_directory": str(Path.cwd())
+            "working_directory": str(Path.cwd()),
         }
 
         final_state = await manager.execute_workflow(
-            "product-planning",
-            context=context
+            "product-planning", context=context
         )
 
         print(f"Workflow Status: {final_state.status}")
-        print(f"Completed Steps: {len(final_state.completed_steps)}/{len(final_state.step_results)}")
+        print(
+            f"Completed Steps: {len(final_state.completed_steps)}/{len(final_state.step_results)}"
+        )
 
         if final_state.step_results:
             print("\nStep Results:")
             for step_name, result in final_state.step_results.items():
-                status_icon = "✓" if hasattr(result, 'status') and result.status.value == "succeeded" else "✗"
+                status_icon = (
+                    "✓"
+                    if hasattr(result, "status") and result.status.value == "succeeded"
+                    else "✗"
+                )
                 print(f"  {status_icon} {step_name}")
 
         if final_state.context.get("error"):
@@ -102,7 +109,7 @@ async def demo_workflow_execution():
     else:
         print("'product-planning' workflow not found")
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
 
 async def demo_hook_integration():
@@ -117,20 +124,14 @@ async def demo_hook_integration():
             "prompt": "Create specifications for a user authentication system",
             "project_context": {
                 "project_type": "web_api",
-                "tech_stack": ["FastAPI", "PostgreSQL", "JWT"]
-            }
+                "tech_stack": ["FastAPI", "PostgreSQL", "JWT"],
+            },
         },
-        context={
-            "verbose": True,
-            "working_directory": str(Path.cwd())
-        }
+        context={"verbose": True, "working_directory": str(Path.cwd())},
     )
 
     # Create and execute instruction hook
-    instruction_hook = AgentOSHook(
-        instruction="create-spec",
-        category="core"
-    )
+    instruction_hook = AgentOSHook(instruction="create-spec", category="core")
 
     result = await instruction_hook.execute(hook_input)
 
@@ -139,7 +140,7 @@ async def demo_hook_integration():
         print("Hook Results:")
         print(json.dumps(result.output.data, indent=2))
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
 
 def demo_custom_workflow():
@@ -155,20 +156,20 @@ def demo_custom_workflow():
         WorkflowStep(
             instruction="plan-product",
             category="core",
-            description="Initial product planning and structure"
+            description="Initial product planning and structure",
         ),
         WorkflowStep(
             instruction="create-spec",
             category="core",
             description="Create technical specifications",
-            depends_on=["plan-product"]
+            depends_on=["plan-product"],
         ),
         WorkflowStep(
             instruction="analyze-product",
             category="core",
             description="Analyze requirements and dependencies",
-            depends_on=["create-spec"]
-        )
+            depends_on=["create-spec"],
+        ),
     ]
 
     # Create custom workflow
@@ -176,10 +177,7 @@ def demo_custom_workflow():
         name="demo-workflow",
         description="Demo workflow for Agent OS integration",
         steps=steps,
-        metadata={
-            "tags": ["demo", "integration"],
-            "estimated_time": "30-45 minutes"
-        }
+        metadata={"tags": ["demo", "integration"], "estimated_time": "30-45 minutes"},
     )
 
     print(f"Created workflow: {workflow.name}")
@@ -190,7 +188,7 @@ def demo_custom_workflow():
         deps = f" (depends on: {', '.join(step.depends_on)})" if step.depends_on else ""
         print(f"  {i}. {step.instruction}{deps}")
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
 
 async def main():

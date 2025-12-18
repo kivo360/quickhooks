@@ -23,7 +23,7 @@ def audit_documentation_examples():
     issues = []
 
     # Find all markdown files
-    md_files = list(Path(".").glob("**/*.md"))
+    md_files = list(Path().glob("**/*.md"))
 
     for md_file in md_files:
         print(f"\n📄 Checking {md_file.name}...")
@@ -71,7 +71,7 @@ def audit_test_configurations():
     issues = []
 
     # Find all test files
-    test_files = list(Path(".").glob("test*.py")) + list(
+    test_files = list(Path().glob("test*.py")) + list(
         Path("tests").glob("*.py") if Path("tests").exists() else []
     )
 

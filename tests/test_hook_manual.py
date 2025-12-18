@@ -19,6 +19,7 @@ def test_hook(input_data, expected_contains=None, should_modify=True):
         capture_output=True,
         text=True,
         timeout=10,
+        check=False,
     )
 
     if process.returncode != 0:
@@ -132,9 +133,8 @@ def main():
     if passed == total:
         print("🎉 All tests passed! The hook is working correctly.")
         return True
-    else:
-        print("❌ Some tests failed. Check the implementation.")
-        return False
+    print("❌ Some tests failed. Check the implementation.")
+    return False
 
 
 if __name__ == "__main__":

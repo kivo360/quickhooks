@@ -5,6 +5,7 @@ This creates a minimal hook that follows the official documentation exactly.
 """
 
 import json
+import os
 import subprocess
 import tempfile
 
@@ -145,6 +146,7 @@ def test_hook_with_inputs():
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
 
             print(f"Exit Code: {result.returncode}")

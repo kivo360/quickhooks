@@ -234,7 +234,7 @@ Duration: {duration:.2f}s
             for result in failed_tests:
                 report += f"  {result.test_name}: {result.status}\n"
                 if result.error:
-                    report += f"    Error: {str(result.error)}\n"
+                    report += f"    Error: {result.error!s}\n"
             report += "\n"
 
         return report.strip()
@@ -283,14 +283,14 @@ Duration: {duration:.2f}s
                 xml += f'  <testcase classname="{classname}" name="{name}" time="{result.duration}">\n'
                 xml += f'    <failure message="{str(result.error) if result.error else "Test failed"}">\n'
                 if result.error:
-                    xml += f"      {str(result.error)}\n"
+                    xml += f"      {result.error!s}\n"
                 xml += "    </failure>\n"
                 xml += "  </testcase>\n"
             elif result.status == "error":
                 xml += f'  <testcase classname="{classname}" name="{name}" time="{result.duration}">\n'
                 xml += f'    <error message="{str(result.error) if result.error else "Test error"}">\n'
                 if result.error:
-                    xml += f"      {str(result.error)}\n"
+                    xml += f"      {result.error!s}\n"
                 xml += "    </error>\n"
                 xml += "  </testcase>\n"
 
@@ -309,7 +309,6 @@ Duration: {duration:.2f}s
 
         if report_format == "json":
             return self.generate_json_report(results)
-        elif report_format == "junit":
+        if report_format == "junit":
             return self.generate_junit_report(results)
-        else:
-            return self.generate_text_report(results)
+        return self.generate_text_report(results)

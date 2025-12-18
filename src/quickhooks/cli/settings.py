@@ -1,10 +1,11 @@
 """CLI commands for managing Claude Code settings.json files."""
 
-import json
+import sys
 from pathlib import Path
-from typing import Optional
+from typing import Annotated
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -17,26 +18,28 @@ from quickhooks.claude_code import (
     SettingsManager,
 )
 
-app = typer.Typer(help="Manage Claude Code settings.json files")
+app = cyclopts.App(help="Manage Claude Code settings.json files")
 console = Console()
 
 
-@app.command()
+@app.command
 def init(
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Overwrite existing file",
-    ),
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
+    force: Annotated[
+        bool, Parameter("--force", alias="-f", help="Overwrite existing file")
+    ] = False,
 ):
-    """Initialize a new Claude Code settings.json file."""
+    """Initialize a new Claude Code settings.json file.
+
+    Parameters
+    ----------
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    force
+        Overwrite existing file (default: False)
+    """
     settings_path = Path(path)
 
     if settings_path.exists() and not force:
@@ -44,7 +47,7 @@ def init(
             f"[yellow]Settings file already exists at {settings_path}[/yellow]"
         )
         console.print("Use --force to overwrite")
-        raise typer.Exit(1)
+        sys.exit(1)
 
     # Create default settings
     settings = ClaudeCodeSettings(
@@ -58,16 +61,19 @@ def init(
     console.print(f"[green]✅ Created settings file at {settings_path}[/green]")
 
 
-@app.command()
+@app.command
 def validate(
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
 ):
-    """Validate a Claude Code settings.json file."""
+    """Validate a Claude Code settings.json file.
+
+    Parameters
+    ----------
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    """
     settings_path = Path(path)
 
     try:
@@ -80,23 +86,28 @@ def validate(
             manager.validate_schema()
             console.print("[green]✅ Schema validation passed[/green]")
         except FileNotFoundError:
-            console.print("[yellow]⚠️  Schema file not found, skipped schema validation[/yellow]")
+            console.print(
+                "[yellow]⚠️  Schema file not found, skipped schema validation[/yellow]"
+            )
 
     except Exception as e:
         console.print(f"[red]❌ Validation failed: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def show(
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
 ):
-    """Display current settings."""
+    """Display current settings.
+
+    Parameters
+    ----------
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    """
     settings_path = Path(path)
 
     try:
@@ -107,41 +118,48 @@ def show(
         json_str = manager.to_json(indent=2)
         syntax = Syntax(json_str, "json", theme="monokai", line_numbers=True)
 
-        console.print(Panel(syntax, title=f"Settings: {settings_path}", border_style="blue"))
+        console.print(
+            Panel(syntax, title=f"Settings: {settings_path}", border_style="blue")
+        )
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def add_hook(
-    event: str = typer.Argument(..., help="Hook event name (e.g., UserPromptSubmit)"),
-    command: str = typer.Argument(..., help="Command to execute"),
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
-    matcher: Optional[str] = typer.Option(
-        None,
-        "--matcher",
-        "-m",
-        help="Optional tool name matcher pattern",
-    ),
-    timeout: Optional[float] = typer.Option(
-        None,
-        "--timeout",
-        "-t",
-        help="Optional timeout in seconds",
-    ),
+    event: str,
+    command: str,
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
+    matcher: Annotated[
+        str | None,
+        Parameter("--matcher", alias="-m", help="Optional tool name matcher pattern"),
+    ] = None,
+    timeout: Annotated[
+        float | None, Parameter("--timeout", alias="-t", help="Optional timeout in seconds")
+    ] = None,
 ):
     """Add a hook to settings.
 
     Examples:
         quickhooks settings add-hook UserPromptSubmit ".claude/hooks/my_hook.py"
         quickhooks settings add-hook PostToolUse "prettier --write" --matcher "Edit|Write"
+
+    Parameters
+    ----------
+    event
+        Hook event name (e.g., UserPromptSubmit)
+    command
+        Command to execute
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    matcher
+        Optional tool name matcher pattern
+    timeout
+        Optional timeout in seconds
     """
     settings_path = Path(path)
 
@@ -157,7 +175,7 @@ def add_hook(
             console.print("Valid events:")
             for e in HookEventName:
                 console.print(f"  - {e.value}")
-            raise typer.Exit(1)
+            sys.exit(1)
 
         # Create hook command
         hook_cmd = HookCommand(
@@ -178,30 +196,36 @@ def add_hook(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def remove_hook(
-    event: str = typer.Argument(..., help="Hook event name"),
-    command_pattern: str = typer.Argument(..., help="Command pattern to remove"),
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
-    matcher: Optional[str] = typer.Option(
-        None,
-        "--matcher",
-        "-m",
-        help="Optional tool name matcher pattern",
-    ),
+    event: str,
+    command_pattern: str,
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
+    matcher: Annotated[
+        str | None,
+        Parameter("--matcher", alias="-m", help="Optional tool name matcher pattern"),
+    ] = None,
 ):
     """Remove hooks matching a pattern.
 
     Example:
         quickhooks settings remove-hook UserPromptSubmit "my_hook.py"
+
+    Parameters
+    ----------
+    event
+        Hook event name
+    command_pattern
+        Command pattern to remove
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    matcher
+        Optional tool name matcher pattern
     """
     settings_path = Path(path)
 
@@ -214,37 +238,43 @@ def remove_hook(
             event_enum = HookEventName(event)
         except ValueError:
             console.print(f"[red]Invalid event name: {event}[/red]")
-            raise typer.Exit(1)
+            sys.exit(1)
 
         removed = manager.remove_hook(event_enum, command_pattern, matcher=matcher)
         manager.save()
 
         if removed:
-            console.print(f"[green]✅ Removed hooks matching '{command_pattern}' from {event}[/green]")
+            console.print(
+                f"[green]✅ Removed hooks matching '{command_pattern}' from {event}[/green]"
+            )
         else:
-            console.print(f"[yellow]No hooks found matching '{command_pattern}'[/yellow]")
+            console.print(
+                f"[yellow]No hooks found matching '{command_pattern}'[/yellow]"
+            )
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def list_hooks(
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
-    event: Optional[str] = typer.Option(
-        None,
-        "--event",
-        "-e",
-        help="Filter by event name",
-    ),
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
+    event: Annotated[
+        str | None, Parameter("--event", alias="-e", help="Filter by event name")
+    ] = None,
 ):
-    """List all hooks."""
+    """List all hooks.
+
+    Parameters
+    ----------
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    event
+        Filter by event name
+    """
     settings_path = Path(path)
 
     try:
@@ -257,7 +287,7 @@ def list_hooks(
                 event_enum = HookEventName(event)
             except ValueError:
                 console.print(f"[red]Invalid event name: {event}[/red]")
-                raise typer.Exit(1)
+                sys.exit(1)
 
         hooks = manager.list_hooks(event_enum)
 
@@ -279,24 +309,30 @@ def list_hooks(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def set_env(
-    key: str = typer.Argument(..., help="Environment variable name"),
-    value: str = typer.Argument(..., help="Environment variable value"),
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
+    key: str,
+    value: str,
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
 ):
     """Set an environment variable.
 
     Example:
         quickhooks settings set-env ANTHROPIC_MODEL claude-opus-4-1
+
+    Parameters
+    ----------
+    key
+        Environment variable name
+    value
+        Environment variable value
+    path
+        Path to settings.json file (default: ".claude/settings.json")
     """
     settings_path = Path(path)
 
@@ -311,19 +347,22 @@ def set_env(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def list_env(
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
 ):
-    """List all environment variables."""
+    """List all environment variables.
+
+    Parameters
+    ----------
+    path
+        Path to settings.json file (default: ".claude/settings.json")
+    """
     settings_path = Path(path)
 
     try:
@@ -347,25 +386,31 @@ def list_env(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
-@app.command()
+@app.command
 def add_permission(
-    permission_type: str = typer.Argument(..., help="Permission type: allow, ask, or deny"),
-    rule: str = typer.Argument(..., help="Permission rule (e.g., 'Bash(git add:*)')"),
-    path: str = typer.Option(
-        ".claude/settings.json",
-        "--path",
-        "-p",
-        help="Path to settings.json file",
-    ),
+    permission_type: str,
+    rule: str,
+    path: Annotated[
+        str, Parameter("--path", alias="-p", help="Path to settings.json file")
+    ] = ".claude/settings.json",
 ):
     """Add a permission rule.
 
     Examples:
         quickhooks settings add-permission allow "Bash(git add:*)"
         quickhooks settings add-permission deny "Read(*.env)"
+
+    Parameters
+    ----------
+    permission_type
+        Permission type: allow, ask, or deny
+    rule
+        Permission rule (e.g., 'Bash(git add:*)')
+    path
+        Path to settings.json file (default: ".claude/settings.json")
     """
     settings_path = Path(path)
 
@@ -380,7 +425,7 @@ def add_permission(
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

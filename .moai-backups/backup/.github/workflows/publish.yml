@@ -1,0 +1,226 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        description: 'Publish to Test PyPI instead of PyPI'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras --dev
+
+      - name: Run full test suite
+        run: |
+          uv run pytest tests/ -v --cov=quickhooks --cov-fail-under=80
+
+      - name: Run linting
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Run type checking
+        run: |
+          uv run mypy src/quickhooks
+
+      - name: Validate version consistency
+        run: |
+          # Check that git tag matches pyproject.toml version
+          if [ "${{ github.event_name }}" = "release" ]; then
+            PYPROJECT_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+            GIT_TAG=${GITHUB_REF#refs/tags/}
+            if [ "v$PYPROJECT_VERSION" != "$GIT_TAG" ]; then
+              echo "Error: Version mismatch between pyproject.toml ($PYPROJECT_VERSION) and git tag ($GIT_TAG)"
+              exit 1
+            fi
+          fi
+
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras --dev
+
+      - name: Build package
+        run: |
+          uv build --no-sources
+
+      - name: Check package integrity
+        run: |
+          uv run twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 90
+
+  test-install:
+    name: Test Installation
+    runs-on: ${{ matrix.os }}
+    needs: build-package
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      - name: Test wheel installation
+        run: |
+          uv venv test-env
+          source test-env/bin/activate || test-env\Scripts\activate
+          uv pip install dist/*.whl
+          quickhooks --help
+          python -c "import quickhooks; print(f'QuickHooks version: {quickhooks.__version__ if hasattr(quickhooks, \"__version__\") else \"unknown\"}')"
+
+  publish-test-pypi:
+    name: Publish to Test PyPI
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-package, test-install]
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.test_pypi) ||
+      (github.event_name == 'release' && github.event.release.prerelease)
+    environment:
+      name: test-pypi
+      url: https://test.pypi.org/p/quickhooks
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+          print-hash: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-package, test-install]
+    if: |
+      (github.event_name == 'workflow_dispatch' && !inputs.test_pypi) ||
+      (github.event_name == 'release' && !github.event.release.prerelease)
+    environment:
+      name: pypi
+      url: https://pypi.org/p/quickhooks
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          print-hash: true
+
+  post-publish:
+    name: Post-Publish Tasks
+    runs-on: ubuntu-latest
+    needs: [publish-pypi]
+    if: success()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release Notes
+        if: github.event_name == 'release'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: context.ref.replace('refs/tags/', '')
+            });
+            
+            const pypiUrl = `https://pypi.org/project/quickhooks/${release.tag_name.replace('v', '')}/`;
+            const installCommand = `uv add quickhooks==${release.tag_name.replace('v', '')}`;
+            
+            const updateBody = release.body + 
+              `\n\n---\n\n` +
+              `📦 **Installation**\n` +
+              `\`\`\`bash\n${installCommand}\n\`\`\`\n\n` +
+              `🔗 **Links**\n` +
+              `- [PyPI Package](${pypiUrl})\n` +
+              `- [Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}#readme)\n`;
+            
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              body: updateBody
+            });
+
+      - name: Notify success
+        run: |
+          echo "✅ Successfully published QuickHooks to PyPI!"
+          echo "📦 Package: https://pypi.org/project/quickhooks/"
+          echo "📖 Install with: uv add quickhooks"

@@ -1,0 +1,180 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+#     "pytest>=7.0.0",
+#     "pytest-asyncio>=0.21.0",
+# ]
+# ///
+"""
+Test suite for {{ class_name }} analyzer hook.
+
+This test suite validates that the {{ class_name }} hook correctly
+analyzes input data and provides appropriate next actions.
+"""
+
+import asyncio
+import json
+import pytest
+from typing import Any, Dict
+
+# Import the hook to test
+from {{ hook_name }} import {{ class_name }}, {{ class_name }}Input
+
+
+class Test{{ class_name }}:
+    """Test cases for {{ class_name }} analyzer hook."""
+
+    @pytest.fixture
+    def analyzer(self):
+        """Create {{ class_name }} analyzer instance."""
+        return {{ class_name }}()
+
+    {% for test in test_cases %}
+    @pytest.mark.asyncio
+    async def test_{{ test.name }}(self, analyzer):
+        """Test case: {{ test.description }}"""
+
+        # Prepare test input
+        test_input = {{ class_name }}Input(**{{ test.input }})
+
+        # Execute analyzer
+        result = await analyzer.execute(test_input)
+
+        # Assert results
+        {% if test.expected_success %}
+        assert result.status == "success"
+        assert result.allowed == True
+        assert result.data is not None
+        {% else %}
+        assert result.status in ["failed", "error"]
+        assert result.allowed == False
+        {% endif %}
+
+        {% if test.expected_next_actions %}
+        # Verify expected next actions
+        for action in {{ test.expected_next_actions }}:
+            assert action in result.next_actions
+        {% endif %}
+
+        # Verify metadata
+        assert result.metadata is not None
+        assert "hook_name" in result.metadata
+        assert result.metadata["hook_name"] == "{{ class_name }}"
+
+    {% endfor %}
+
+    @pytest.mark.asyncio
+    async def test_skill_context_handling(self, analyzer):
+        """Test handling of skill context data."""
+
+        context_input = {{ class_name }}Input(
+            {{ skill_context_test_input | default({'test_field': 'test_value'}) }},
+            skill_context={
+                "workflow_type": "test_workflow",
+                "previous_steps": ["step1", "step2"],
+                "user_preferences": {"format": "json"}
+            },
+            workflow_step="validation"
+        )
+
+        result = await analyzer.execute(context_input)
+
+        assert result.status == "success"
+        assert result.allowed == True
+        assert "skill_context" in result.data
+        assert result.metadata["workflow_step"] == "validation"
+
+    @pytest.mark.asyncio
+    async def test_next_actions_generation(self, analyzer):
+        """Test next actions generation based on analysis."""
+
+        # Test with data that should trigger specific actions
+        trigger_input = {{ class_name }}Input(**{{ next_action_test_input | default({'test_field': 'trigger_value'}) }})
+
+        result = await analyzer.execute(trigger_input)
+
+        assert result.status == "success"
+        assert isinstance(result.next_actions, list)
+
+        # Should suggest relevant next actions
+        if result.next_actions:
+            for action in result.next_actions:
+                assert isinstance(action, str)
+                assert len(action.strip()) > 0
+
+    @pytest.mark.asyncio
+    async def test_analyzer_error_handling(self, analyzer):
+        """Test error handling in analyzer."""
+
+        # Test with data that might cause exceptions
+        problematic_input = {{ class_name }}Input(**{{ error_test_input | default({'test_field': None}) }})
+
+        result = await analyzer.execute(problematic_input)
+
+        # Should handle errors gracefully
+        assert result.status == "error"
+        assert result.allowed == False
+        assert result.data == {}
+        assert result.next_actions == []
+        assert "error" in result.metadata
+
+    @pytest.mark.asyncio
+    async def test_analyzer_integration(self, analyzer):
+        """Test analyzer integration with JSON input/output."""
+
+        # Test JSON input validation (simulating hook input)
+        json_input = """{{ integration_test_input | default({'test_field': 'test_value'}) | tojson }}"""
+
+        # Parse and analyze
+        input_data = json.loads(json_input)
+        test_input = {{ class_name }}Input(**input_data)
+
+        result = await analyzer.execute(test_input)
+
+        # Verify output is serializable
+        output_json = json.dumps(result.model_dump())
+        assert json.loads(output_json)  # Should not raise exception
+
+        # Verify all required fields are present
+        assert "status" in result.model_dump()
+        assert "allowed" in result.model_dump()
+        assert "data" in result.model_dump()
+        assert "next_actions" in result.model_dump()
+        assert "metadata" in result.model_dump()
+
+    def test_analyzer_configuration(self):
+        """Test analyzer initialization and configuration."""
+
+        analyzer = {{ class_name }}()
+
+        # Verify analyzer is properly initialized
+        assert analyzer is not None
+        assert hasattr(analyzer, 'execute')
+        assert hasattr(analyzer, '_validate_input_requirements')
+        assert hasattr(analyzer, '_process_data')
+        assert hasattr(analyzer, '_determine_next_actions')
+
+    @pytest.mark.asyncio
+    async def test_workflow_progression(self, analyzer):
+        """Test analyzer behavior in workflow progression."""
+
+        workflow_steps = ["input_validation", "data_processing", "analysis", "output_generation"]
+
+        for step in workflow_steps:
+            step_input = {{ class_name }}Input(
+                {{ workflow_test_input | default({'test_field': 'test_value'}) }},
+                workflow_step=step
+            )
+
+            result = await analyzer.execute(step_input)
+
+            assert result.status == "success"
+            assert result.metadata["workflow_step"] == step
+
+
+if __name__ == "__main__":
+    # Run tests directly
+    pytest.main([__file__, "-v"])

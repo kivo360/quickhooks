@@ -16,7 +16,6 @@ from quickhooks.claude_code.models import (
     HookEventName,
     HookMatcher,
     Permissions,
-    StatusLine,
 )
 
 
@@ -67,18 +66,18 @@ class SettingsManager:
                 self.settings = ClaudeCodeSettings()
                 self._raw_data = {}
                 return self.settings
-            raise FileNotFoundError(f"Settings file not found: {self.settings_path}")
+            msg = f"Settings file not found: {self.settings_path}"
+            raise FileNotFoundError(msg)
 
-        with open(self.settings_path, "r") as f:
+        with open(self.settings_path) as f:
             self._raw_data = json.load(f)
 
         try:
             self.settings = ClaudeCodeSettings.model_validate(self._raw_data)
             return self.settings
         except ValidationError as e:
-            raise ValidationError(
-                f"Invalid settings file at {self.settings_path}: {e}"
-            ) from e
+            msg = f"Invalid settings file at {self.settings_path}: {e}"
+            raise ValidationError(msg) from e
 
     def save(self, indent: int = 2) -> None:
         """Save current settings to file.
@@ -90,7 +89,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         # Ensure parent directory exists
         self.settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,16 +119,18 @@ class SettingsManager:
             ValidationError: If settings don't match schema
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if schema_path is None:
             schema_path = self.settings_path.parent / "settings_schema.json"
 
         schema_path = Path(schema_path)
         if not schema_path.exists():
-            raise FileNotFoundError(f"Schema file not found: {schema_path}")
+            msg = f"Schema file not found: {schema_path}"
+            raise FileNotFoundError(msg)
 
-        with open(schema_path, "r") as f:
+        with open(schema_path) as f:
             schema = json.load(f)
 
         # Use jsonschema for validation
@@ -141,7 +143,8 @@ class SettingsManager:
             # Fallback to Pydantic validation only
             return True
         except jsonschema.ValidationError as e:
-            raise ValidationError(f"Schema validation failed: {e}") from e
+            msg = f"Schema validation failed: {e}"
+            raise ValidationError(msg) from e
 
     # Hook Management Methods
 
@@ -162,7 +165,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         # Convert string to enum if needed
         if isinstance(event, str):
@@ -213,7 +217,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if self.settings.hooks is None:
             return False
@@ -268,7 +273,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if self.settings.hooks is None:
             return {}
@@ -300,14 +306,14 @@ class SettingsManager:
             ValueError: If no settings are loaded or key is invalid
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         import re
 
         if not re.match(r"^[A-Z_][A-Z0-9_]*$", key):
-            raise ValueError(
-                f"Invalid environment variable name '{key}'. Must match ^[A-Z_][A-Z0-9_]*$"
-            )
+            msg = f"Invalid environment variable name '{key}'. Must match ^[A-Z_][A-Z0-9_]*$"
+            raise ValueError(msg)
 
         if self.settings.env is None:
             self.settings.env = {}
@@ -328,7 +334,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if self.settings.env is None:
             return default
@@ -348,7 +355,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if self.settings.env is None:
             return False
@@ -369,7 +377,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         return (self.settings.env or {}).copy()
 
@@ -389,12 +398,12 @@ class SettingsManager:
             ValueError: If no settings are loaded or invalid permission type
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if permission_type not in {"allow", "ask", "deny"}:
-            raise ValueError(
-                f"Invalid permission type '{permission_type}'. Must be 'allow', 'ask', or 'deny'"
-            )
+            msg = f"Invalid permission type '{permission_type}'. Must be 'allow', 'ask', or 'deny'"
+            raise ValueError(msg)
 
         if self.settings.permissions is None:
             self.settings.permissions = Permissions()
@@ -426,12 +435,12 @@ class SettingsManager:
             ValueError: If no settings are loaded or invalid permission type
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         if permission_type not in {"allow", "ask", "deny"}:
-            raise ValueError(
-                f"Invalid permission type '{permission_type}'. Must be 'allow', 'ask', or 'deny'"
-            )
+            msg = f"Invalid permission type '{permission_type}'. Must be 'allow', 'ask', or 'deny'"
+            raise ValueError(msg)
 
         if self.settings.permissions is None:
             return False
@@ -458,7 +467,8 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         return self.settings.model_dump()
 
@@ -475,12 +485,15 @@ class SettingsManager:
             ValueError: If no settings are loaded
         """
         if self.settings is None:
-            raise ValueError("No settings loaded. Call load() first.")
+            msg = "No settings loaded. Call load() first."
+            raise ValueError(msg)
 
         return json.dumps(self.settings.model_dump(), indent=indent)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], settings_path: str | Path) -> "SettingsManager":
+    def from_dict(
+        cls, data: dict[str, Any], settings_path: str | Path
+    ) -> "SettingsManager":
         """Create a SettingsManager from a dictionary.
 
         Args:

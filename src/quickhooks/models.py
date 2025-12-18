@@ -123,9 +123,8 @@ class ExecutionContext(BaseModel):
         """Validate environment values."""
         allowed_environments = {"development", "testing", "staging", "production"}
         if v not in allowed_environments:
-            raise ValueError(
-                f"Environment must be one of: {', '.join(allowed_environments)}"
-            )
+            msg = f"Environment must be one of: {', '.join(allowed_environments)}"
+            raise ValueError(msg)
         return v
 
 

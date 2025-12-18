@@ -75,6 +75,7 @@ def test_official_format_compliance():
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
 
         print(
@@ -102,11 +103,10 @@ def test_official_format_compliance():
             except json.JSONDecodeError:
                 print("   JSON Response: ❌ Invalid JSON")
                 print(f"   Raw stdout: {result.stdout}")
+        elif test_case["expect_json"]:
+            print("   JSON Response: ⚠️  None (expected some)")
         else:
-            if test_case["expect_json"]:
-                print("   JSON Response: ⚠️  None (expected some)")
-            else:
-                print("   JSON Response: ✅ None (expected)")
+            print("   JSON Response: ✅ None (expected)")
 
         # Check stderr feedback
         if result.stderr.strip():
@@ -148,6 +148,7 @@ def test_current_implementation_compatibility():
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
 
         print(f"Exit Code: {result.returncode}")

@@ -4,25 +4,27 @@ This module manages complex Agent OS workflows, coordinating
 multiple instructions and handling workflow state.
 """
 
+import contextlib
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
+from quickhooks.models import HookResult
+
 from .executor import AgentOSExecutor
 from .instruction_parser import InstructionParser
-from ..models import HookResult
 
 
 class WorkflowStep(BaseModel):
     """Represents a single step in a workflow."""
 
     instruction: str
-    category: Optional[str] = None
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    depends_on: List[str] = Field(default_factory=list)
-    condition: Optional[str] = None
+    category: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    depends_on: list[str] = Field(default_factory=list)
+    condition: str | None = None
 
 
 class WorkflowDefinition(BaseModel):
@@ -30,19 +32,19 @@ class WorkflowDefinition(BaseModel):
 
     name: str
     description: str
-    steps: List[WorkflowStep]
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    steps: list[WorkflowStep]
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class WorkflowState(BaseModel):
     """Represents the state of a workflow execution."""
 
     workflow_name: str
-    current_step: Optional[str] = None
-    completed_steps: List[str] = Field(default_factory=list)
-    failed_steps: List[str] = Field(default_factory=list)
-    step_results: Dict[str, Any] = Field(default_factory=dict)
-    context: Dict[str, Any] = Field(default_factory=dict)
+    current_step: str | None = None
+    completed_steps: list[str] = Field(default_factory=list)
+    failed_steps: list[str] = Field(default_factory=list)
+    step_results: dict[str, Any] = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict)
     status: str = "pending"  # pending, running, completed, failed
 
 
@@ -51,9 +53,9 @@ class WorkflowManager:
 
     def __init__(
         self,
-        agent_os_path: Optional[Path] = None,
-        workflows_path: Optional[Path] = None,
-        working_directory: Optional[Path] = None,
+        agent_os_path: Path | None = None,
+        workflows_path: Path | None = None,
+        working_directory: Path | None = None,
     ):
         """
         Initialize the workflow manager.
@@ -73,18 +75,13 @@ class WorkflowManager:
 
         # Ensure workflows directory exists
         self.workflows_path.mkdir(parents=True, exist_ok=True)
-        print(f"DEBUG: Workflow manager initialized with paths:")
-        print(f"DEBUG: agent_os_path: {self.agent_os_path}")
-        print(f"DEBUG: workflows_path: {self.workflows_path}")
-        print(f"DEBUG: working_directory: {self.working_directory}")
-        print(f"DEBUG: workflows_path exists: {self.workflows_path.exists()}")
 
     def create_workflow(
         self,
         name: str,
         description: str,
-        steps: List[WorkflowStep],
-        metadata: Optional[Dict[str, Any]] = None,
+        steps: list[WorkflowStep],
+        metadata: dict[str, Any] | None = None,
     ) -> WorkflowDefinition:
         """
         Create a new workflow definition.
@@ -104,17 +101,14 @@ class WorkflowManager:
 
         # Save workflow definition
         workflow_file = self.workflows_path / f"{name}.json"
-        try:
-            workflow_file.write_text(workflow.model_dump_json(indent=2), encoding="utf-8")
-            print(f"DEBUG: Saved workflow to {workflow_file}")
-        except Exception as e:
-            print(f"DEBUG: Failed to save workflow: {e}")
-            print(f"DEBUG: Workflows path: {self.workflows_path}")
-            print(f"DEBUG: Workflows path exists: {self.workflows_path.exists()}")
+        with contextlib.suppress(Exception):
+            workflow_file.write_text(
+                workflow.model_dump_json(indent=2), encoding="utf-8"
+            )
 
         return workflow
 
-    def load_workflow(self, name: str) -> Optional[WorkflowDefinition]:
+    def load_workflow(self, name: str) -> WorkflowDefinition | None:
         """
         Load a workflow definition.
 
@@ -135,7 +129,7 @@ class WorkflowManager:
         except (json.JSONDecodeError, Exception):
             return None
 
-    def list_workflows(self) -> List[str]:
+    def list_workflows(self) -> list[str]:
         """
         List available workflow names.
 
@@ -147,8 +141,8 @@ class WorkflowManager:
     async def execute_workflow(
         self,
         name: str,
-        context: Optional[Dict[str, Any]] = None,
-        resume_state: Optional[WorkflowState] = None,
+        context: dict[str, Any] | None = None,
+        resume_state: WorkflowState | None = None,
     ) -> WorkflowState:
         """
         Execute a workflow.
@@ -196,17 +190,14 @@ class WorkflowManager:
                         return state
 
                 # Check condition if present
-                if step.condition:
-                    if not self._evaluate_condition(step.condition, state.context):
-                        # Skip step due to failed condition
-                        continue
+                if step.condition and not self._evaluate_condition(
+                    step.condition, state.context
+                ):
+                    # Skip step due to failed condition
+                    continue
 
                 # Execute the step
                 state.current_step = step.instruction
-                print(f"DEBUG: Executing step: {step.instruction}")
-                print(f"DEBUG: Category: {step.category}")
-                print(f"DEBUG: Parameters: {step.parameters}")
-                print(f"DEBUG: Context: {state.context}")
 
                 result: HookResult = await self.executor.execute_instruction(
                     step.instruction,
@@ -214,21 +205,14 @@ class WorkflowManager:
                     {**state.context, **step.parameters},
                 )
 
-                print(f"DEBUG: Step result status: {result.status}")
-                print(f"DEBUG: Step result status value: {result.status.value}")
-                print(f"DEBUG: Step result: {result}")
-
                 # Store result
                 state.step_results[step.instruction] = result
 
                 if result.status.value == "success":
-                    print(f"DEBUG: Step {step.instruction} succeeded")
                     state.completed_steps.append(step.instruction)
                 else:
-                    print(f"DEBUG: Step {step.instruction} failed")
                     state.failed_steps.append(step.instruction)
                     if result.output_data and result.output_data.error:
-                        print(f"DEBUG: Error from result: {result.output_data.error}")
                         state.context["last_error"] = result.output_data.error
                     break
 
@@ -247,7 +231,7 @@ class WorkflowManager:
 
         return state
 
-    def _evaluate_condition(self, condition: str, context: Dict[str, Any]) -> bool:
+    def _evaluate_condition(self, condition: str, context: dict[str, Any]) -> bool:
         """
         Evaluate a step condition.
 
@@ -269,11 +253,7 @@ class WorkflowManager:
         # Handle simple boolean expressions
         if condition.lower() in ("true", "yes", "1"):
             return True
-        elif condition.lower() in ("false", "no", "0"):
-            return False
-
-        # Default to True for unknown conditions
-        return True
+        return condition.lower() not in ("false", "no", "0")
 
     def save_workflow_state(self, state: WorkflowState) -> None:
         """
@@ -285,7 +265,7 @@ class WorkflowManager:
         state_file = self.workflows_path / f".{state.workflow_name}_state.json"
         state_file.write_text(state.model_dump_json(indent=2), encoding="utf-8")
 
-    def load_workflow_state(self, workflow_name: str) -> Optional[WorkflowState]:
+    def load_workflow_state(self, workflow_name: str) -> WorkflowState | None:
         """
         Load workflow state from file.
 

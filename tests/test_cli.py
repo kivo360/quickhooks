@@ -18,6 +18,7 @@ def test_cli_commands():
         cwd=project_root,
         capture_output=True,
         text=True,
+        check=False,
     )
     print(f"Version command output: {result.stdout}")
     print(f"Version command error: {result.stderr}")
@@ -30,6 +31,7 @@ def test_cli_commands():
         cwd=project_root,
         capture_output=True,
         text=True,
+        check=False,
     )
     print(f"Hello command output: {result.stdout}")
     print(f"Hello command error: {result.stderr}")
@@ -42,6 +44,7 @@ def test_cli_commands():
         cwd=project_root,
         capture_output=True,
         text=True,
+        check=False,
     )
     print(f"Hello command output: {result.stdout}")
     print(f"Hello command error: {result.stderr}")

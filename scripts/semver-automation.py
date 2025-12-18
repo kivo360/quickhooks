@@ -89,7 +89,7 @@ class SemVerAnalyzer:
         # Initialize QuickHooks template renderer
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
         self.template_renderer = TemplateRenderer(template_dir=template_dir)
-        
+
         # Get project info for templates
         self.project_name = self._get_project_name()
         self.current_version = self._get_current_version()
@@ -137,20 +137,20 @@ class SemVerAnalyzer:
                         "--pretty=format:",
                         "--name-only",
                     ]
-                    diff_result = subprocess.run(
-                        diff_cmd, capture_output=True, text=True
+                    subprocess.run(
+                        diff_cmd, capture_output=True, text=True, check=False
                     )
 
                     # Get detailed diff
                     full_diff_cmd = ["git", "show", commit_hash]
                     full_diff_result = subprocess.run(
-                        full_diff_cmd, capture_output=True, text=True
+                        full_diff_cmd, capture_output=True, text=True, check=False
                     )
 
                     # Get stats
                     stats_cmd = ["git", "show", "--stat", commit_hash]
                     stats_result = subprocess.run(
-                        stats_cmd, capture_output=True, text=True
+                        stats_cmd, capture_output=True, text=True, check=False
                     )
 
                     # Parse insertions/deletions from stats
@@ -341,8 +341,10 @@ class SemVerAnalyzer:
     def _get_project_name(self) -> str:
         """Get project name from pyproject.toml."""
         try:
-            pyproject_path = os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")
-            with open(pyproject_path, "r") as f:
+            pyproject_path = os.path.join(
+                os.path.dirname(__file__), "..", "pyproject.toml"
+            )
+            with open(pyproject_path) as f:
                 pyproject = toml.load(f)
                 return pyproject.get("project", {}).get("name", "Python Package")
         except Exception:
@@ -351,8 +353,10 @@ class SemVerAnalyzer:
     def _get_current_version(self) -> str:
         """Get current version from pyproject.toml."""
         try:
-            pyproject_path = os.path.join(os.path.dirname(__file__), "..", "pyproject.toml")
-            with open(pyproject_path, "r") as f:
+            pyproject_path = os.path.join(
+                os.path.dirname(__file__), "..", "pyproject.toml"
+            )
+            with open(pyproject_path) as f:
                 pyproject = toml.load(f)
                 return pyproject.get("project", {}).get("version", "0.0.0")
         except Exception:
@@ -370,21 +374,23 @@ class SemVerAnalyzer:
                     if len(change.diff) > 1500
                     else change.diff
                 )
-            
-            template_changes.append({
-                "commit_hash": change.commit_hash,
-                "message": change.message,
-                "files_changed": change.files_changed,
-                "insertions": change.insertions,
-                "deletions": change.deletions,
-                "diff_sample": diff_sample
-            })
+
+            template_changes.append(
+                {
+                    "commit_hash": change.commit_hash,
+                    "message": change.message,
+                    "files_changed": change.files_changed,
+                    "insertions": change.insertions,
+                    "deletions": change.deletions,
+                    "diff_sample": diff_sample,
+                }
+            )
 
         return self.template_renderer.render(
             "prompts/semver_reasoning.j2",
             project_name=self.project_name,
             current_version=self.current_version,
-            changes=template_changes
+            changes=template_changes,
         )
 
     def _build_verification_prompt(
@@ -394,18 +400,20 @@ class SemVerAnalyzer:
         # Prepare changes for template
         template_changes = []
         for change in changes:
-            template_changes.append({
-                "commit_hash": change.commit_hash,
-                "message": change.message,
-                "files_changed": change.files_changed,
-                "insertions": change.insertions,
-                "deletions": change.deletions
-            })
+            template_changes.append(
+                {
+                    "commit_hash": change.commit_hash,
+                    "message": change.message,
+                    "files_changed": change.files_changed,
+                    "insertions": change.insertions,
+                    "deletions": change.deletions,
+                }
+            )
 
         return self.template_renderer.render(
             "prompts/semver_verification.j2",
             reasoning_output=reasoning_output,
-            changes=template_changes
+            changes=template_changes,
         )
 
     def _heuristic_analysis(self, changes: list[GitChange]) -> CommitAnalysis:
@@ -508,9 +516,9 @@ class SemVerAnalyzer:
 
         if bump_type == VersionBumpType.MAJOR:
             return f"{major + 1}.0.0"
-        elif bump_type == VersionBumpType.MINOR:
+        if bump_type == VersionBumpType.MINOR:
             return f"{major}.{minor + 1}.0"
-        elif bump_type == VersionBumpType.PATCH:
+        if bump_type == VersionBumpType.PATCH:
             return f"{major}.{minor}.{patch + 1}"
 
         return current_version
@@ -646,9 +654,8 @@ def main():
 
             print("Wrote analysis to semver-output.json")
             return 0
-        else:
-            print("❌ Failed to update version")
-            return 1
+        print("❌ Failed to update version")
+        return 1
 
     except Exception as e:
         print(f"Error: {e}")

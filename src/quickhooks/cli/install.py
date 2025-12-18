@@ -1,4 +1,4 @@
-"""Global installation commands for Context Portal integration with Claude Code."""
+"""Generic hook installation utilities for Claude Code."""
 
 import json
 import os
@@ -6,16 +6,18 @@ import platform
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
 from quickhooks.schema.models import (
     ClaudeSettings,
-    create_context_portal_hook_config,
+    HookCommand,
+    HookMatcher,
 )
 from quickhooks.schema.validator import (
     ClaudeSettingsValidator,
@@ -41,7 +43,7 @@ def check_uv_available() -> bool:
     """Check if UV is available in PATH."""
     try:
         result = subprocess.run(
-            ["uv", "--version"], capture_output=True, text=True, timeout=5
+            ["uv", "--version"], capture_output=True, text=True, timeout=5, check=False
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -56,7 +58,11 @@ def get_uv_python_executable() -> Path | None:
     try:
         # First try to find Python using UV's discovery
         result = subprocess.run(
-            ["uv", "python", "find"], capture_output=True, text=True, timeout=10
+            ["uv", "python", "find"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
         )
         if result.returncode == 0:
             python_path = result.stdout.strip()
@@ -71,6 +77,7 @@ def get_uv_python_executable() -> Path | None:
             capture_output=True,
             text=True,
             timeout=120,
+            check=False,
         )
         if result.returncode == 0:
             # Try to find the installed Python
@@ -79,6 +86,7 @@ def get_uv_python_executable() -> Path | None:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                check=False,
             )
             if result.returncode == 0:
                 python_path = result.stdout.strip()
@@ -151,32 +159,74 @@ def get_python_executable(venv_path: Path | None = None) -> Path:
     return Path(sys.executable)
 
 
-def create_context_portal_hook_script(
-    venv_path: Path | None, claude_dir: Path
+def create_hook_script(
+    source_hook: Path,
+    claude_dir: Path | None = None,
+    venv_path: Path | None = None,
+    hook_name: str | None = None,
 ) -> Path:
-    """Create the Context Portal hook script in Claude's directory."""
+    """Create a hook script in Claude's hooks directory.
+
+    Args:
+        source_hook: Path to the source hook file
+        claude_dir: Claude config directory (defaults to ~/.claude or .claude)
+        venv_path: Virtual environment path (optional)
+        hook_name: Name for the hook script (defaults to source_hook.name)
+
+    Returns:
+        Path to the created hook script
+    """
+    if claude_dir is None:
+        # Try local .claude first, then global
+        local_claude = Path.cwd() / ".claude"
+        claude_dir = local_claude if local_claude.exists() else get_claude_config_dir()
+
     hooks_dir = claude_dir / "hooks"
-    hooks_dir.mkdir(exist_ok=True)
-
-    python_exe = get_python_executable(venv_path)
-
-    # Get the source hook file
-    source_hook = (
-        Path(__file__).parent.parent.parent.parent
-        / "hooks"
-        / "context_portal_memory.py"
-    )
+    hooks_dir.mkdir(parents=True, exist_ok=True)
 
     if not source_hook.exists():
-        raise FileNotFoundError(f"Context Portal hook not found at: {source_hook}")
+        msg = f"Source hook not found at: {source_hook}"
+        raise FileNotFoundError(msg)
 
-    # Create a wrapper script that uses the correct Python environment
-    hook_script = hooks_dir / "context_portal_memory.py"
+    # Use provided name or source hook name
+    hook_filename = hook_name or source_hook.name
+    hook_script = hooks_dir / hook_filename
 
-    # Create a wrapper that ensures the correct Python environment
+    # Check if hook uses PEP 723 (has # /// script marker) or uv run shebang
+    is_pep723 = False
+    has_uv_shebang = False
+    try:
+        with open(source_hook, encoding="utf-8") as f:
+            first_line = f.readline().strip()
+            # Check for uv run shebang (uv run -s or uv run -S)
+            uv_in_shebang = "uv run -s" in first_line or "uv run -S" in first_line
+            if first_line.startswith("#!") and uv_in_shebang:
+                has_uv_shebang = True
+            # Check for PEP 723 marker in first 20 lines
+            if not has_uv_shebang:
+                for i, line in enumerate(f):
+                    if i >= 19:  # Already read first line, so 19 more
+                        break
+                    if "# /// script" in line:
+                        is_pep723 = True
+                        break
+    except (OSError, UnicodeDecodeError):
+        pass
+
+    # If PEP 723 or has uv shebang, just copy the file directly (it's self-contained)
+    if is_pep723 or has_uv_shebang:
+        import shutil
+
+        shutil.copy2(source_hook, hook_script)
+        os.chmod(hook_script, 0o755)
+        return hook_script
+
+    # Otherwise, create a wrapper script
+    python_exe = get_python_executable(venv_path)
+
     wrapper_content = f'''#!/usr/bin/env python3
 """
-Global Context Portal Memory Hook for Claude Code
+Hook wrapper for Claude Code
 Auto-generated wrapper that uses the correct Python environment.
 
 Original hook location: {source_hook}
@@ -194,7 +244,7 @@ PYTHON_EXECUTABLE = r"{python_exe}"
 HOOK_SCRIPT = r"{source_hook}"
 
 def main():
-    """Run the Context Portal hook using the correct Python environment."""
+    """Run the hook using the correct Python environment."""
     try:
         # Always use subprocess to run the hook with correct Python
         input_data = sys.stdin.read()
@@ -214,7 +264,7 @@ def main():
             error_response = {{
                 'allowed': True,
                 'modified': False,
-                'message': f'Context Portal hook error: {{result.stderr}}'
+                'message': f'Hook error: {{result.stderr}}'
             }}
             print(json.dumps(error_response))
 
@@ -223,7 +273,7 @@ def main():
         error_response = {{
             'allowed': True,
             'modified': False,
-            'message': f'Context Portal hook error: {{str(e)}}'
+            'message': f'Hook error: {{str(e)}}'
         }}
         print(json.dumps(error_response))
 
@@ -257,433 +307,424 @@ def get_current_claude_settings(claude_dir: Path) -> dict[str, Any]:
     return {}
 
 
-def update_claude_settings_with_hooks(claude_dir: Path, hook_script: Path) -> None:
-    """Update Claude Code settings to include Context Portal hooks using schema validation."""
+def update_claude_settings_with_hook(
+    hook_script: Path,
+    tools: list[str] | None = None,
+    hook_type: str = "PreToolUse",
+    timeout: int = 30,
+    claude_dir: Path | None = None,
+    matcher: str | None = None,
+) -> None:
+    """Update Claude Code settings to include a hook configuration.
+
+    Args:
+        hook_script: Path to the hook script
+        tools: List of tools to match (defaults to ["*"] for all tools)
+        hook_type: Hook event type (defaults to "PreToolUse")
+        timeout: Timeout in seconds (defaults to 30)
+        claude_dir: Claude config directory (defaults to ~/.claude or .claude)
+        matcher: Custom matcher pattern (overrides tools if provided)
+    """
+    if claude_dir is None:
+        # Try local .claude first, then global
+        local_claude = Path.cwd() / ".claude"
+        claude_dir = local_claude if local_claude.exists() else get_claude_config_dir()
+
     settings_file = claude_dir / "settings.json"
-    settings = get_current_claude_settings(claude_dir)
+    settings_dict = get_current_claude_settings(claude_dir)
 
-    # Initialize schema validator
-    validator = ClaudeSettingsValidator()
-
-    # Create Pydantic-validated hook configuration
-    context_portal_tools = [
-        "Bash",
-        "Edit",
-        "Write",
-        "Read",
-        "Grep",
-        "Glob",
-        "Task",
-        "WebFetch",
-        "WebSearch",
-    ]
-
+    # Convert to ClaudeSettings model for type-safe manipulation
     try:
-        hook_config = create_context_portal_hook_config(
-            tools=context_portal_tools, command=str(hook_script), timeout=30
+        claude_settings = ClaudeSettings(**settings_dict)
+    except Exception as e:
+        console.print(
+            f"⚠️  Warning: Existing settings have validation issues: {e}",
+            style="yellow",
         )
-        console.print("✅ Created Pydantic-validated hook configuration")
-    except ValueError as e:
-        console.print(f"❌ Hook configuration error: {e}", style="red")
-        raise typer.Exit(code=1)
+        console.print("Attempting to fix and continue...")
+        # Create minimal valid settings
+        claude_settings = ClaudeSettings()
 
     # Ensure hooks configuration exists
-    if "hooks" not in settings:
-        settings["hooks"] = {}
+    if claude_settings.hooks is None:
+        claude_settings.hooks = {}
 
-    # Add PreToolUse hooks
-    if "PreToolUse" not in settings["hooks"]:
-        settings["hooks"]["PreToolUse"] = []
+    # Determine hook command
+    is_pep723 = False
+    has_uv_shebang = False
+    try:
+        with open(hook_script, encoding="utf-8") as f:
+            first_line = f.readline().strip()
+            # Check for uv run shebang (uv run -s or uv run -S)
+            uv_in_shebang = "uv run -s" in first_line or "uv run -S" in first_line
+            if first_line.startswith("#!") and uv_in_shebang:
+                has_uv_shebang = True
+            # Check for PEP 723 marker in first 20 lines
+            if not has_uv_shebang:
+                for i, line in enumerate(f):
+                    if i >= 19:  # Already read first line, so 19 more
+                        break
+                    if "# /// script" in line:
+                        is_pep723 = True
+                        break
+    except (OSError, UnicodeDecodeError):
+        pass
 
-    # Context Portal hook configuration using schema-generated structure
-    context_portal_config = hook_config["PreToolUse"][0]
+    # Use explicit uv run -s for PEP 723 hooks or hooks with uv shebang
+    if is_pep723 or has_uv_shebang:
+        hook_command = f"uv run -s {hook_script}"
+    else:
+        hook_command = str(hook_script)
 
-    # Check if Context Portal hook already exists
-    existing_hook = None
-    for i, existing_hook_config in enumerate(settings["hooks"]["PreToolUse"]):
-        if any(
-            "context_portal_memory" in str(hook.get("command", ""))
-            for hook in existing_hook_config.get("hooks", [])
-        ):
-            existing_hook = i
+    # Create matcher pattern
+    if matcher:
+        hook_matcher_pattern = matcher
+    elif tools:
+        if len(tools) == 1:
+            hook_matcher_pattern = tools[0]
+        elif "*" in tools or len(tools) == 0:
+            hook_matcher_pattern = "*"
+        else:
+            hook_matcher_pattern = "|".join(tools)
+    else:
+        hook_matcher_pattern = "*"
+
+    # Create HookCommand and HookMatcher using Pydantic models
+    hook_cmd = HookCommand(type="command", command=hook_command, timeout=timeout)
+    hook_matcher = HookMatcher(matcher=hook_matcher_pattern, hooks=[hook_cmd])
+
+    # Get or create hook list for this event type
+    if hook_type not in claude_settings.hooks:
+        claude_settings.hooks[hook_type] = []
+
+    # Check if hook already exists (by script name)
+    hook_name = hook_script.name
+    existing_hook_idx = None
+    for i, existing_matcher in enumerate(claude_settings.hooks[hook_type]):
+        for hook in existing_matcher.hooks:
+            if hook_name in hook.command:
+                existing_hook_idx = i
+                break
+        if existing_hook_idx is not None:
             break
 
-    if existing_hook is not None:
-        # Update existing hook
-        settings["hooks"]["PreToolUse"][existing_hook] = context_portal_config
-        console.print("✅ Updated existing Context Portal hook configuration")
+    if existing_hook_idx is not None:
+        # Update existing hook matcher
+        claude_settings.hooks[hook_type][existing_hook_idx] = hook_matcher
+        console.print(f"✅ Updated existing hook configuration: {hook_name}")
     else:
-        # Add new hook
-        settings["hooks"]["PreToolUse"].append(context_portal_config)
-        console.print("✅ Added Context Portal hook configuration")
+        # Add new hook matcher to the list
+        claude_settings.hooks[hook_type].append(hook_matcher)
+        console.print(f"✅ Added hook configuration: {hook_name}")
 
-    # Validate settings with both JSON schema and Pydantic
-    is_valid, errors = validator.validate_settings(settings)
+    # Validate settings with JSON schema validator
+    validator = ClaudeSettingsValidator()
+    settings_dict = claude_settings.model_dump(by_alias=True, exclude_none=False)
+    is_valid, errors = validator.validate_settings(settings_dict)
     if not is_valid:
         console.print(
             "❌ Generated settings failed JSON schema validation:", style="red"
         )
         for error in errors:
             console.print(f"   {error}", style="red")
-        raise typer.Exit(code=1)
+        sys.exit(1)
 
-    # Additional Pydantic validation
-    try:
-        ClaudeSettings(**settings)
-        console.print("✅ Settings passed Pydantic validation")
-    except Exception as e:
-        console.print(
-            f"❌ Generated settings failed Pydantic validation: {e}", style="red"
-        )
-        raise typer.Exit(code=1)
+    console.print("✅ Settings passed Pydantic and schema validation")
 
-    # Write updated settings
+    # Write updated settings (using model_dump to preserve aliases and structure)
     with open(settings_file, "w") as f:
-        json.dump(settings, f, indent=2)
+        json.dump(settings_dict, f, indent=2)
 
     console.print(f"📝 Updated Claude settings: {settings_file}")
     console.print("✅ Settings validated against official schema")
 
 
-def install_context_portal_global() -> None:
-    """Install Context Portal integration globally for Claude Code."""
+# CLI commands - functions are registered in main.py
+# Keeping install_app for backwards compatibility but commands are registered in main CLI
+install_app = cyclopts.App(help="Hook installation and management commands")
+
+
+def install_hook(
+    hook_path: Annotated[str, Parameter(help="Path to the source hook file")],
+    tools: Annotated[
+        str | None,
+        Parameter("--tools", alias="-t", help="Comma-separated list of tools"),
+    ] = None,
+    hook_type: Annotated[
+        str, Parameter("--hook-type", help="Hook event type")
+    ] = "PreToolUse",
+    timeout: Annotated[int, Parameter("--timeout", help="Timeout in seconds")] = 30,
+    claude_dir: Annotated[
+        str | None, Parameter("--claude-dir", help="Claude config directory")
+    ] = None,
+    matcher: Annotated[
+        str | None, Parameter("--matcher", alias="-m", help="Custom matcher pattern")
+    ] = None,
+    venv_path: Annotated[
+        str | None, Parameter("--venv", help="Virtual environment path")
+    ] = None,
+    hook_name: Annotated[
+        str | None, Parameter("--name", alias="-n", help="Name for the hook script")
+    ] = None,
+    local: Annotated[
+        bool, Parameter("--local", alias="-l", help="Use local .claude directory")
+    ] = False,
+    global_install: Annotated[
+        bool, Parameter("--global", alias="-g", help="Use global ~/.claude directory")
+    ] = False,
+) -> None:
+    """Install a hook to Claude Code hooks directory.
+
+    Args:
+        hook_path: Path to the source hook file
+        tools: Comma-separated list of tools to match (e.g., "Bash,Edit,Write")
+        hook_type: Hook event type (defaults to "PreToolUse")
+        timeout: Timeout in seconds (defaults to 30)
+        claude_dir: Claude config directory (defaults to ~/.claude or .claude)
+        matcher: Custom matcher pattern (overrides tools if provided)
+        venv_path: Virtual environment path (optional)
+        hook_name: Name for the hook script (defaults to source hook name)
+        local: Use local .claude directory instead of global
+        global_install: Use global ~/.claude directory (overrides local)
+    """
+    source_hook = Path(hook_path)
+    if not source_hook.exists():
+        console.print(f"❌ Hook file not found: {hook_path}", style="red")
+        sys.exit(1)
+
+    # Parse tools if provided
+    tools_list = None
+    if tools:
+        tools_list = [t.strip() for t in tools.split(",")]
+
+    # Determine claude directory
+    target_claude_dir = None
+    if claude_dir:
+        target_claude_dir = Path(claude_dir)
+    elif global_install:
+        target_claude_dir = get_claude_config_dir()
+    elif local:
+        target_claude_dir = Path.cwd() / ".claude"
+
+    # Parse venv path if provided
+    venv_path_obj = None
+    if venv_path:
+        venv_path_obj = Path(venv_path)
+
     console.print(
         Panel(
-            Text("🚀 Context Portal Global Installation", style="bold blue"),
-            subtitle="Setting up automatic project memory for Claude Code",
+            Text("🪝 Installing Hook", style="bold blue"),
+            subtitle=f"Installing {source_hook.name} to Claude Code",
         )
     )
 
-    # Check UV availability first
-    uv_available = check_uv_available()
-    if uv_available:
-        console.print(
-            "✅ UV package manager detected - using advanced Python resolution"
-        )
-    else:
-        console.print("ℹ️  UV not available - using manual environment detection")
-
-    # Detect virtual environment
-    venv_path = get_current_venv()
-    if venv_path:
-        console.print(f"🐍 Detected virtual environment: {venv_path}")
-    else:
-        console.print("⚠️  No virtual environment detected")
-
-    # Get the best Python executable
-    python_exe = get_python_executable(venv_path)
-    console.print(f"🐍 Selected Python executable: {python_exe}")
-
-    # Verify Python executable works
     try:
-        result = subprocess.run(
-            [str(python_exe), "--version"], capture_output=True, text=True, timeout=5
+        # Create hook script
+        hook_script = create_hook_script(
+            source_hook=source_hook,
+            claude_dir=target_claude_dir,
+            venv_path=venv_path_obj,
+            hook_name=hook_name,
         )
-        if result.returncode == 0:
-            console.print(f"✅ Python version: {result.stdout.strip()}")
-        else:
-            console.print("⚠️  Warning: Python executable may not be working correctly")
-    except Exception as e:
-        console.print(f"⚠️  Warning: Could not verify Python executable: {e}")
-
-    # Get Claude configuration directory
-    claude_dir = get_claude_config_dir()
-    console.print(f"📁 Claude config directory: {claude_dir}")
-
-    try:
-        # Create the hook script
-        console.print("📝 Creating Context Portal hook script...")
-        hook_script = create_context_portal_hook_script(venv_path, claude_dir)
         console.print(f"✅ Created hook script: {hook_script}")
 
-        # Update Claude settings
-        console.print("⚙️  Updating Claude Code settings...")
-        update_claude_settings_with_hooks(claude_dir, hook_script)
+        # Update settings
+        update_claude_settings_with_hook(
+            hook_script=hook_script,
+            tools=tools_list,
+            hook_type=hook_type,
+            timeout=timeout,
+            claude_dir=target_claude_dir,
+            matcher=matcher,
+        )
 
-        # Create global config template
-        global_config_file = claude_dir / "context_portal_config.json"
-        global_config = {
-            "context_portal": {
-                "database": {
-                    "path": ".context-portal/project.db",
-                    "max_size": "100MB",
-                    "backup_interval": "daily",
-                },
-                "memory": {
-                    "max_decisions": 1000,
-                    "max_tasks": 500,
-                    "max_patterns": 200,
-                    "max_context_entries": 2000,
-                    "cleanup_interval": "monthly",
-                },
-                "search": {
-                    "default_limit": 10,
-                    "max_limit": 50,
-                    "enable_fuzzy_search": True,
-                },
-                "categories": {
-                    "decisions": [
-                        "architecture",
-                        "technical",
-                        "tooling",
-                        "deployment",
-                        "security",
-                        "performance",
-                    ],
-                    "patterns": [
-                        "design_patterns",
-                        "code_patterns",
-                        "test_patterns",
-                        "deployment_patterns",
-                        "security_patterns",
-                    ],
-                    "tasks": [
-                        "development",
-                        "testing",
-                        "deployment",
-                        "documentation",
-                        "maintenance",
-                        "refactoring",
-                    ],
-                },
-            }
-        }
-
-        with open(global_config_file, "w") as f:
-            json.dump(global_config, f, indent=2)
-
-        console.print(f"📋 Created global configuration: {global_config_file}")
-
-        # Success message
         console.print(
             Panel(
-                Text("🎉 Context Portal Installation Complete!", style="bold green")
-                + Text(
-                    "\n\nThe Context Portal is now globally configured for Claude Code.\n"
-                )
-                + Text("It will automatically:\n")
-                + Text("• Capture context from all Claude Code tool usage\n")
-                + Text("• Store decisions, patterns, and project knowledge\n")
-                + Text("• Enhance future tool calls with relevant history\n")
-                + Text("• Build a searchable project memory database\n\n")
-                + Text("Next steps:\n")
-                + Text("• Use Claude Code normally - context capture is automatic\n")
-                + Text("• Check ")
-                + Text(".context-portal/", style="code")
-                + Text(" directories in your projects\n")
-                + Text("• Use ")
-                + Text("claude config", style="code")
-                + Text(" to customize hook settings"),
-                title="Installation Successful",
+                Text("✅ Hook Installation Complete!", style="bold green")
+                + Text(f"\n\nHook installed: {hook_script}\n")
+                + Text(f"Event type: {hook_type}\n")
+                + Text(f"Matcher: {matcher or (tools_list if tools_list else '*')}"),
+                title="Success",
                 border_style="green",
             )
         )
 
     except Exception as e:
         console.print(f"❌ Installation failed: {e}", style="bold red")
-        raise typer.Exit(code=1)
+        sys.exit(1)
 
 
-def uninstall_context_portal_global() -> None:
-    """Uninstall Context Portal integration from Claude Code."""
+def validate_settings(
+    claude_dir: Annotated[
+        str | None, Parameter("--claude-dir", help="Claude config directory")
+    ] = None,
+    local: Annotated[
+        bool, Parameter("--local", alias="-l", help="Use local .claude directory")
+    ] = False,
+) -> None:
+    """Validate Claude Code settings file.
+
+    Args:
+        claude_dir: Claude config directory (defaults to ~/.claude or .claude)
+        local: Use local .claude directory instead of global
+    """
+    # Determine claude directory
+    if claude_dir:
+        target_claude_dir = Path(claude_dir)
+    elif local:
+        target_claude_dir = Path.cwd() / ".claude"
+    else:
+        local_claude = Path.cwd() / ".claude"
+        target_claude_dir = (
+            local_claude if local_claude.exists() else get_claude_config_dir()
+        )
+
+    settings_file = target_claude_dir / "settings.json"
+
     console.print(
         Panel(
-            Text("🗑️  Context Portal Global Uninstallation", style="bold red"),
-            subtitle="Removing Context Portal integration from Claude Code",
+            Text("🔍 Validating Settings", style="bold blue"),
+            subtitle=f"Validating {settings_file}",
         )
     )
 
-    claude_dir = get_claude_config_dir()
+    if not settings_file.exists():
+        console.print(f"❌ Settings file not found: {settings_file}", style="red")
+        sys.exit(1)
 
-    try:
-        # Remove hook script
-        hook_script = claude_dir / "hooks" / "context_portal_memory.py"
-        if hook_script.exists():
-            hook_script.unlink()
-            console.print(f"🗑️  Removed hook script: {hook_script}")
+    # Validate using both methods
+    is_valid, errors = validate_claude_settings_file(settings_file)
 
-        # Update Claude settings to remove hooks
-        settings_file = claude_dir / "settings.json"
-        if settings_file.exists():
-            settings = get_current_claude_settings(claude_dir)
-
-            if "hooks" in settings and "PreToolUse" in settings["hooks"]:
-                # Remove Context Portal hooks
-                original_count = len(settings["hooks"]["PreToolUse"])
-                settings["hooks"]["PreToolUse"] = [
-                    hook_config
-                    for hook_config in settings["hooks"]["PreToolUse"]
-                    if not any(
-                        "context_portal_memory" in str(hook.get("command", ""))
-                        for hook in hook_config.get("hooks", [])
-                    )
-                ]
-
-                removed_count = original_count - len(settings["hooks"]["PreToolUse"])
-                if removed_count > 0:
-                    # Write updated settings
-                    with open(settings_file, "w") as f:
-                        json.dump(settings, f, indent=2)
-                    console.print(
-                        f"🗑️  Removed {removed_count} Context Portal hook(s) from settings"
-                    )
-                else:
-                    console.print("ℹ️  No Context Portal hooks found in settings")
-
-        # Remove global config
-        global_config_file = claude_dir / "context_portal_config.json"
-        if global_config_file.exists():
-            global_config_file.unlink()
-            console.print(f"🗑️  Removed global configuration: {global_config_file}")
-
-        console.print(
-            Panel(
-                Text("✅ Context Portal Uninstallation Complete!", style="bold green")
-                + Text("\n\nContext Portal has been removed from Claude Code.\n")
-                + Text("Existing project databases in ")
-                + Text(".context-portal/", style="code")
-                + Text(" directories are preserved."),
-                title="Uninstallation Successful",
-                border_style="green",
-            )
-        )
-
-    except Exception as e:
-        console.print(f"❌ Uninstallation failed: {e}", style="bold red")
-        raise typer.Exit(code=1)
-
-
-def show_context_portal_status() -> None:
-    """Show the current status of Context Portal installation."""
-    console.print(
-        Panel(
-            Text("📊 Context Portal Status", style="bold blue"),
-            subtitle="Current installation and configuration status",
-        )
-    )
-
-    claude_dir = get_claude_config_dir()
-
-    # Validate existing settings file
-    settings_file = claude_dir / "settings.json"
-    settings_valid = False
-    validation_errors = []
-    if settings_file.exists():
-        settings_valid, validation_errors = validate_claude_settings_file(settings_file)
-
-    # Check hook script
-    hook_script = claude_dir / "hooks" / "context_portal_memory.py"
-    hook_installed = hook_script.exists()
-
-    # Check settings
-    settings = get_current_claude_settings(claude_dir)
-    hooks_configured = False
-    if "hooks" in settings and "PreToolUse" in settings["hooks"]:
-        hooks_configured = any(
-            any(
-                "context_portal_memory" in str(hook.get("command", ""))
-                for hook in hook_config.get("hooks", [])
-            )
-            for hook_config in settings["hooks"]["PreToolUse"]
-        )
-
-    # Check global config
-    global_config_file = claude_dir / "context_portal_config.json"
-    config_exists = global_config_file.exists()
-
-    # Check UV availability
-    uv_available = check_uv_available()
-    uv_version = ""
-    if uv_available:
+    if is_valid:
+        # Also try Pydantic validation
         try:
-            result = subprocess.run(
-                ["uv", "--version"], capture_output=True, text=True, timeout=5
+            settings = get_current_claude_settings(target_claude_dir)
+            ClaudeSettings(**settings)
+            console.print(
+                Panel(
+                    Text("✅ Settings are valid!", style="bold green")
+                    + Text("\n\nPassed both JSON schema and Pydantic validation."),
+                    title="Validation Successful",
+                    border_style="green",
+                )
             )
-            if result.returncode == 0:
-                uv_version = result.stdout.strip()
-        except Exception:
-            pass
-
-    # Check virtual environment
-    venv_path = get_current_venv()
-
-    # Get Python executable with UV resolution info
-    python_exe = get_python_executable(venv_path)
-
-    # Display status
-    status_lines = [
-        f"Hook Script: {'✅ Installed' if hook_installed else '❌ Not found'} ({hook_script})",
-        f"Claude Settings: {'✅ Configured' if hooks_configured else '❌ Not configured'}",
-        f"Settings Schema: {'✅ Valid' if settings_valid else '❌ Invalid'}",
-        f"Global Config: {'✅ Present' if config_exists else '❌ Missing'} ({global_config_file})",
-        f"UV Package Manager: {'✅ Available' if uv_available else '❌ Not available'} ({uv_version})",
-        f"Virtual Environment: {'✅ Detected' if venv_path else '⚠️  System Python'} ({venv_path or 'N/A'})",
-        f"Python Executable: {python_exe}",
-    ]
-
-    # Verify Python executable
-    try:
-        result = subprocess.run(
-            [str(python_exe), "--version"], capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            status_lines.append(f"Python Version: ✅ {result.stdout.strip()}")
-        else:
-            status_lines.append("Python Version: ❌ Not working")
-    except Exception:
-        status_lines.append("Python Version: ❌ Could not verify")
-
-    overall_status = (
-        "✅ Fully Installed"
-        if all([hook_installed, hooks_configured, config_exists, settings_valid])
-        else "⚠️  Partially Installed"
-    )
-
-    console.print(f"\n📊 Overall Status: {overall_status}\n")
-    for line in status_lines:
-        console.print(f"   {line}")
-
-    # Show validation errors if any
-    if validation_errors:
-        console.print("\n❌ Schema Validation Errors:", style="red")
-        for error in validation_errors[:3]:  # Show first 3 errors
-            console.print(f"   • {error}", style="red")
-        if len(validation_errors) > 3:
-            console.print(f"   ... and {len(validation_errors) - 3} more", style="red")
-
-    if uv_available:
-        console.print(
-            "\n🚀 UV Features: Advanced Python resolution and automatic downloads"
-        )
+        except Exception as e:
+            console.print(
+                Panel(
+                    Text(
+                        "⚠️  Schema valid but Pydantic validation failed", style="yellow"
+                    )
+                    + Text(f"\n\nError: {e}"),
+                    title="Partial Validation",
+                    border_style="yellow",
+                )
+            )
     else:
         console.print(
-            "\n💡 Install UV for better Python resolution: curl -LsSf https://astral.sh/uv/install.sh | sh"
+            Panel(
+                Text("❌ Settings validation failed", style="bold red")
+                + Text("\n\nErrors:")
+                + Text("\n".join(f"  • {error}" for error in errors)),
+                title="Validation Failed",
+                border_style="red",
+            )
+        )
+        sys.exit(1)
+
+
+def show_status(
+    claude_dir: Annotated[
+        str | None, Parameter("--claude-dir", help="Claude config directory")
+    ] = None,
+    local: Annotated[
+        bool, Parameter("--local", alias="-l", help="Use local .claude directory")
+    ] = False,
+) -> None:
+    """Show Claude Code hooks installation status.
+
+    Args:
+        claude_dir: Claude config directory (defaults to ~/.claude or .claude)
+        local: Use local .claude directory instead of global
+    """
+    # Determine claude directory
+    if claude_dir:
+        target_claude_dir = Path(claude_dir)
+    elif local:
+        target_claude_dir = Path.cwd() / ".claude"
+    else:
+        local_claude = Path.cwd() / ".claude"
+        target_claude_dir = (
+            local_claude if local_claude.exists() else get_claude_config_dir()
         )
 
-    if not all([hook_installed, hooks_configured, config_exists, settings_valid]):
-        console.print("\n💡 To fix issues, run: quickhooks install-global")
+    console.print(
+        Panel(
+            Text("📊 Hook Installation Status", style="bold blue"),
+            subtitle=f"Status for {target_claude_dir}",
+        )
+    )
 
+    hooks_dir = target_claude_dir / "hooks"
+    settings_file = target_claude_dir / "settings.json"
 
-# CLI commands
-install_app = typer.Typer(help="Context Portal installation commands")
+    # Check hooks directory
+    hooks_installed = hooks_dir.exists() and list(hooks_dir.glob("*.py"))
+    hook_count = len(list(hooks_dir.glob("*.py"))) if hooks_dir.exists() else 0
 
+    # Check settings
+    settings_exists = settings_file.exists()
+    settings_valid = False
+    hooks_configured = False
+    hook_configs = []
 
-@install_app.command("install-global")
-def install_global():
-    """Install Context Portal globally for Claude Code."""
-    install_context_portal_global()
+    if settings_exists:
+        settings_valid, _ = validate_claude_settings_file(settings_file)
+        try:
+            settings_dict = get_current_claude_settings(target_claude_dir)
+            claude_settings = ClaudeSettings(**settings_dict)
 
+            if claude_settings.hooks:
+                for hook_type, hook_list in claude_settings.hooks.items():
+                    for hook_matcher in hook_list:
+                        for hook_cmd in hook_matcher.hooks:
+                            hook_configs.append(
+                                {
+                                    "type": hook_type,
+                                    "command": hook_cmd.command,
+                                    "timeout": hook_cmd.timeout,
+                                    "matcher": hook_matcher.matcher or "*",
+                                }
+                            )
+                hooks_configured = len(hook_configs) > 0
+        except Exception as e:
+            console.print(f"⚠️  Warning: Could not parse settings: {e}", style="yellow")
 
-@install_app.command("uninstall-global")
-def uninstall_global():
-    """Uninstall Context Portal from Claude Code."""
-    uninstall_context_portal_global()
+    # Display status
+    hooks_dir_status = "✅ Exists" if hooks_dir.exists() else "❌ Not found"
+    hooks_installed_status = "✅" if hooks_installed else "❌"
+    settings_exists_status = "✅ Exists" if settings_exists else "❌ Not found"
+    settings_valid_status = "✅ Valid" if settings_valid else "❌ Invalid"
+    hooks_configured_status = "✅" if hooks_configured else "❌"
 
+    status_lines = [
+        f"Hooks Directory: {hooks_dir_status} ({hooks_dir})",
+        f"Hooks Installed: {hooks_installed_status} ({hook_count} files)",
+        f"Settings File: {settings_exists_status} ({settings_file})",
+        f"Settings Valid: {settings_valid_status}",
+        f"Hooks Configured: {hooks_configured_status} "
+        f"({len(hook_configs)} configurations)",
+    ]
 
-@install_app.command("status")
-def status():
-    """Show Context Portal installation status."""
-    show_context_portal_status()
+    console.print("\n" + "\n".join(f"   {line}" for line in status_lines))
+
+    if hook_configs:
+        console.print("\n[bold]Configured Hooks:[/bold]")
+        for i, config in enumerate(hook_configs, 1):
+            console.print(f"   {i}. {Path(config['command']).name}")
+            console.print(f"      Type: {config['type']}")
+            console.print(f"      Matcher: {config['matcher']}")
+            console.print(f"      Timeout: {config['timeout']}s")
+            console.print()
 
 
 if __name__ == "__main__":

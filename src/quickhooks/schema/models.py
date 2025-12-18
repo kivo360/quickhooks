@@ -100,7 +100,8 @@ class PostToolUseResponse(HookResponse):
     def validate_block_reason(self):
         """Ensure reason is provided when decision is 'block'."""
         if self.decision == "block" and not self.reason:
-            raise ValueError("'reason' is required when decision='block'")
+            msg = "'reason' is required when decision='block'"
+            raise ValueError(msg)
         return self
 
 
@@ -153,9 +154,8 @@ class ClaudeSettings(BaseModel):
 
         for key in v:
             if not re.match(r"^[A-Z_][A-Z0-9_]*$", key):
-                raise ValueError(
-                    f"Environment variable key '{key}' must follow pattern ^[A-Z_][A-Z0-9_]*$"
-                )
+                msg = f"Environment variable key '{key}' must follow pattern ^[A-Z_][A-Z0-9_]*$"
+                raise ValueError(msg)
 
         return v
 
@@ -178,9 +178,8 @@ class ClaudeSettings(BaseModel):
 
         for hook_type in v:
             if hook_type not in valid_hook_types:
-                raise ValueError(
-                    f"Hook type '{hook_type}' is not supported. Valid types: {valid_hook_types}"
-                )
+                msg = f"Hook type '{hook_type}' is not supported. Valid types: {valid_hook_types}"
+                raise ValueError(msg)
 
         return v
 
@@ -232,7 +231,8 @@ def create_context_portal_hook_config(
 
     invalid_tools = set(tools) - valid_tools
     if invalid_tools:
-        raise ValueError(f"Invalid tools: {invalid_tools}. Valid tools: {valid_tools}")
+        msg = f"Invalid tools: {invalid_tools}. Valid tools: {valid_tools}"
+        raise ValueError(msg)
 
     # Create matcher pattern
     if len(tools) == 1:
@@ -312,7 +312,8 @@ def validate_settings_file(settings_path: str) -> ClaudeSettings:
 
     path = Path(settings_path)
     if not path.exists():
-        raise FileNotFoundError(f"Settings file not found: {settings_path}")
+        msg = f"Settings file not found: {settings_path}"
+        raise FileNotFoundError(msg)
 
     with open(path) as f:
         data = json.load(f)

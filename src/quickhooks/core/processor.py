@@ -182,8 +182,7 @@ class ParallelProcessor:
                     await asyncio.sleep(delay)
                     self.stats.retry_count += 1
                     continue
-                else:
-                    break
+                break
 
         # All retries exhausted
         end_time = time.perf_counter()
@@ -241,10 +240,9 @@ class ParallelProcessor:
             except TimeoutError:
                 # Timeout waiting for tasks - continue to check shutdown
                 continue
-            except Exception as e:
+            except Exception:
                 self.current_workers = max(0, self.current_workers - 1)
                 # Log error but continue processing
-                print(f"Worker error: {e}")
 
     def _check_dependencies(self, task: ProcessingTask) -> bool:
         """Check if task dependencies are satisfied."""
@@ -385,7 +383,8 @@ class ParallelProcessor:
             elif mode == ProcessingMode.BATCH:
                 results = await self.run_batch(tasks)
             else:
-                raise ValueError(f"Unknown processing mode: {mode}")
+                msg = f"Unknown processing mode: {mode}"
+                raise ValueError(msg)
 
             return results
 

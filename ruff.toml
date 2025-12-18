@@ -1,0 +1,68 @@
+line-length = 88
+target-version = "py312"
+
+[lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "S101",    # use of assert in tests
+    "S301",    # suspicious pickle usage
+    "PLR2004", # magic value used in comparison
+    "SLF001",  # private member accessed in tests
+    "PLR6301", # no self use in method
+    "PLW0603", # using the global statement
+    "PLW2901", # redefined loop name
+    "B018",    # useless expression
+    "B015",    # useless comparison
+    "PT001",   # use of pytest fixture without parentheses
+    "PT023",   # incorrect mark placement
+    "PT004",   # incorrect fixture name
+    "PT005",   # incorrect fixture name
+    "PT006",   # incorrect name for pytest fixture
+    "PT007",   # incorrect parametrize mark
+    "PT011",   # pytest.raises() without match
+    "PT012",   # pytest.raises() with multiple parameters
+    "PT017",   # assertion in exception handler
+    "PT018",   # assertion should be broken down
+    "PT019",   # fixture without return value
+    "PT020",   # deprecated pytest.warn
+    "PT021",   # deprecated pytest.warn
+    "PT022",   # no teardown in fixture
+    "PT024",   # deprecated pytest.usefixtures
+    "PT025",   # deprecated pytest.warn
+    "S603",    # use of insecure subprocess call in tests
+    "S607",    # start a process with a partial path
+    "S105",    # possible hardcoded password
+    "E501",    # line too long
+]
+
+[lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[lint.isort]
+known-first-party = ["quickhooks"]
+force-single-line = false
+split-on-trailing-comma = true
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+

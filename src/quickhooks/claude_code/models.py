@@ -7,7 +7,7 @@ official JSON schema from https://json.schemastore.org/claude-code-settings.json
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class HookCommand(BaseModel):
@@ -119,7 +119,8 @@ class Permissions(BaseModel):
     def validate_unique_rules(cls, v: list[str] | None) -> list[str] | None:
         """Ensure permission rules are unique."""
         if v is not None and len(v) != len(set(v)):
-            raise ValueError("Permission rules must be unique")
+            msg = "Permission rules must be unique"
+            raise ValueError(msg)
         return v
 
 
@@ -288,11 +289,10 @@ class ClaudeCodeSettings(BaseModel):
         if v is not None:
             import re
 
-            for key in v.keys():
+            for key in v:
                 if not re.match(r"^[A-Z_][A-Z0-9_]*$", key):
-                    raise ValueError(
-                        f"Environment variable '{key}' must match pattern ^[A-Z_][A-Z0-9_]*$"
-                    )
+                    msg = f"Environment variable '{key}' must match pattern ^[A-Z_][A-Z0-9_]*$"
+                    raise ValueError(msg)
         return v
 
     @field_validator("hooks")
@@ -303,11 +303,10 @@ class ClaudeCodeSettings(BaseModel):
         """Validate hook event names."""
         if v is not None:
             valid_events = {e.value for e in HookEventName}
-            for event_name in v.keys():
+            for event_name in v:
                 if event_name not in valid_events:
-                    raise ValueError(
-                        f"Invalid hook event '{event_name}'. Must be one of: {', '.join(valid_events)}"
-                    )
+                    msg = f"Invalid hook event '{event_name}'. Must be one of: {', '.join(valid_events)}"
+                    raise ValueError(msg)
         return v
 
     def model_dump_json(self, **kwargs: Any) -> str:

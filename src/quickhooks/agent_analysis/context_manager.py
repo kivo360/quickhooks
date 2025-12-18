@@ -40,12 +40,11 @@ class ContextManager:
         if self._is_code_heavy(text):
             # Code tends to be more token-dense
             return int(char_count / 3.5)
-        elif self._is_technical_text(text):
+        if self._is_technical_text(text):
             # Technical text with many technical terms
             return int(char_count / 3.8)
-        else:
-            # Regular text
-            return int(char_count / 4.2)
+        # Regular text
+        return int(char_count / 4.2)
 
     def _is_code_heavy(self, text: str) -> bool:
         """Check if text contains a lot of code."""
@@ -187,22 +186,21 @@ class ContextManager:
                     return chunk[: last_break + len(break_char)]
 
             return chunk
-        else:
-            if len(text) <= target_chars:
-                return text
+        if len(text) <= target_chars:
+            return text
 
-            # Get from end
-            chunk = text[-target_chars:]
+        # Get from end
+        chunk = text[-target_chars:]
 
-            # Try to break at a reasonable point from the beginning
-            for break_char in ["\n\n", "\n", ". ", "! ", "? ", "; "]:
-                first_break = chunk.find(break_char)
-                if (
-                    first_break != -1 and first_break < target_chars * 0.3
-                ):  # Don't break too late
-                    return chunk[first_break + len(break_char) :]
+        # Try to break at a reasonable point from the beginning
+        for break_char in ["\n\n", "\n", ". ", "! ", "? ", "; "]:
+            first_break = chunk.find(break_char)
+            if (
+                first_break != -1 and first_break < target_chars * 0.3
+            ):  # Don't break too late
+                return chunk[first_break + len(break_char) :]
 
-            return chunk
+        return chunk
 
     def calculate_total_tokens(self, chunks: list[ContextChunk], prompt: str) -> int:
         """Calculate total tokens for chunks plus prompt."""

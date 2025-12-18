@@ -15,9 +15,9 @@ from .processor import (
 
 __all__ = [
     "ParallelProcessor",
-    "ProcessingTask",
-    "ProcessingResult",
     "ProcessingMode",
     "ProcessingPriority",
+    "ProcessingResult",
     "ProcessingStats",
+    "ProcessingTask",
 ]

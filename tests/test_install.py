@@ -38,11 +38,13 @@ class TestVirtualEnvironmentDetection:
         """Test when no virtual environment is detected."""
         # Clear all environment variables that indicate virtual environments
         env_vars_to_clear = ["CONDA_PREFIX", "VIRTUAL_ENV", "PIPENV_ACTIVE"]
-        with patch.dict(os.environ, dict.fromkeys(env_vars_to_clear, ""), clear=True):
-            with patch("sys.prefix", "/usr/local"):
-                with patch("sys.base_prefix", "/usr/local"):
-                    venv = get_current_venv()
-                    assert venv is None
+        with (
+            patch.dict(os.environ, dict.fromkeys(env_vars_to_clear, ""), clear=True),
+            patch("sys.prefix", "/usr/local"),
+            patch("sys.base_prefix", "/usr/local"),
+        ):
+            venv = get_current_venv()
+            assert venv is None
 
     def test_get_python_executable_with_venv(self):
         """Test Python executable detection with virtual environment."""

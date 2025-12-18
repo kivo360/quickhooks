@@ -27,9 +27,7 @@ class DiscoveredAgent:
 class AgentDiscovery:
     """Discovers and indexes agents from the Claude Code agents directory."""
 
-    def __init__(
-        self, agents_dir: Path | None = None, db_path: Path | None = None
-    ):
+    def __init__(self, agents_dir: Path | None = None, db_path: Path | None = None):
         """
         Initialize the agent discovery system.
 
@@ -69,7 +67,6 @@ class AgentDiscovery:
             Number of agents indexed
         """
         if not self.agents_dir.exists():
-            print(f"Agents directory not found: {self.agents_dir}")
             return 0
 
         if force_reindex:
@@ -218,8 +215,7 @@ class AgentDiscovery:
                 },
             )
 
-        except Exception as e:
-            print(f"Error parsing agent file {file_path}: {e}")
+        except Exception:
             return None
 
     def _parse_python_agent(self, content: str) -> tuple[str, list[str], str]:

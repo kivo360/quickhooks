@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # dependencies = [
-#   "typer[all]>=0.9.0",
+#   "cyclopts>=0.3.0",
 #   "rich>=13.7.0",
 # ]
 # requires-python = ">=3.12"
@@ -37,27 +37,25 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Confirm
 from rich.table import Table
 
 console = Console()
-app = typer.Typer(help="Setup QuickHooks PEP 723 hooks for Claude Code")
+app = cyclopts.App(help="Setup QuickHooks PEP 723 hooks for Claude Code")
 
 
 def check_uv_installed() -> bool:
     """Check if UV is installed and available."""
     try:
         result = subprocess.run(
-            ["uv", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["uv", "--version"], check=False, capture_output=True, text=True, timeout=5
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -67,9 +65,7 @@ def check_uv_installed() -> bool:
 def display_requirements_check() -> dict[str, bool]:
     """Display and return requirements check results."""
     table = Table(
-        title="Requirements Check",
-        show_header=True,
-        header_style="bold magenta"
+        title="Requirements Check", show_header=True, header_style="bold magenta"
     )
     table.add_column("Requirement", style="cyan", width=30)
     table.add_column("Status", justify="center", width=10)
@@ -79,27 +75,35 @@ def display_requirements_check() -> dict[str, bool]:
 
     # Check UV
     checks["uv_installed"] = check_uv_installed()
+    status_icon = "✅" if checks["uv_installed"] else "❌"
+    status_color = "green" if checks["uv_installed"] else "red"
     table.add_row(
         "UV Package Manager",
-        f"[{'green' if checks['uv_installed'] else 'red'}]{'✅' if checks['uv_installed'] else '❌'}[/]",
-        "UV must be installed to run PEP 723 hooks"
+        f"[{status_color}]{status_icon}[/]",
+        "UV must be installed to run PEP 723 hooks",
     )
 
     # Check Python version
     import sys
+
     checks["python_version"] = sys.version_info >= (3, 12)
+    py_status_icon = "✅" if checks["python_version"] else "❌"
+    py_status_color = "green" if checks["python_version"] else "red"
+    py_version_str = f"{sys.version_info.major}.{sys.version_info.minor}"
     table.add_row(
         "Python Version",
-        f"[{'green' if checks['python_version'] else 'red'}]{'✅' if checks['python_version'] else '❌'}[/]",
-        f"Python 3.12+ required (found {sys.version_info.major}.{sys.version_info.minor})"
+        f"[{py_status_color}]{py_status_icon}[/]",
+        f"Python 3.12+ required (found {py_version_str})",
     )
 
     # Check GROQ API key (optional)
     checks["groq_api_key"] = bool(os.getenv("GROQ_API_KEY"))
+    groq_status_icon = "✅" if checks["groq_api_key"] else "⚠️"
+    groq_status_color = "green" if checks["groq_api_key"] else "yellow"
     table.add_row(
         "GROQ API Key",
-        f"[{'green' if checks['groq_api_key'] else 'yellow'}]{'✅' if checks['groq_api_key'] else '⚠️'}[/]",
-        "Optional - Required for agent analysis hook"
+        f"[{groq_status_color}]{groq_status_icon}[/]",
+        "Optional - Required for agent analysis hook",
     )
 
     console.print(table)
@@ -112,12 +116,14 @@ def get_quickhooks_dir() -> Path:
     return Path(__file__).parent.parent
 
 
-def install_hooks(target_dir: Optional[Path] = None):
+def install_hooks(target_dir: Path | None = None):
     """Install QuickHooks PEP 723 hooks to target directory."""
     if target_dir is None:
         target_dir = Path.cwd()
 
-    console.print(f"\n[bold blue]Installing QuickHooks PEP 723 hooks to: {target_dir}[/bold blue]")
+    console.print(
+        f"\n[bold blue]Installing QuickHooks PEP 723 hooks to: {target_dir}[/bold blue]"
+    )
 
     # Create .claude/hooks directory
     hooks_dir = target_dir / ".claude" / "hooks"
@@ -128,14 +134,15 @@ def install_hooks(target_dir: Optional[Path] = None):
     source_hooks_dir = get_quickhooks_dir() / ".claude" / "hooks"
 
     if not source_hooks_dir.exists():
-        console.print(f"[red]❌ Source hooks directory not found: {source_hooks_dir}[/red]")
-        raise typer.Exit(1)
+        console.print(
+            f"[red]❌ Source hooks directory not found: {source_hooks_dir}[/red]"
+        )
+        sys.exit(1)
 
     hook_files = [
         "example_hook_pep723.py",
         "agent_analysis_hook_pep723.py",
-        "context_portal_hook_pep723.py",
-        "README.md"
+        "README.md",
     ]
 
     for hook_file in hook_files:
@@ -156,8 +163,14 @@ def install_hooks(target_dir: Optional[Path] = None):
     source_settings = get_quickhooks_dir() / ".claude" / "settings.json"
 
     if settings_file.exists():
-        if not Confirm.ask(f"\n[yellow]Settings file already exists at {settings_file}. Overwrite?[/yellow]"):
-            console.print("[yellow]Skipping settings.json (existing file preserved)[/yellow]")
+        overwrite_msg = (
+            f"\n[yellow]Settings file already exists at "
+            f"{settings_file}. Overwrite?[/yellow]"
+        )
+        if not Confirm.ask(overwrite_msg):
+            console.print(
+                "[yellow]Skipping settings.json (existing file preserved)[/yellow]"
+            )
         else:
             shutil.copy2(source_settings, settings_file)
             console.print(f"✅ Updated settings: {settings_file}")
@@ -176,8 +189,9 @@ def install_hooks(target_dir: Optional[Path] = None):
 
     # Show hook configuration
     console.print("\n[bold blue]Hook Configuration:[/bold blue]")
-    console.print(Panel(
-        """To enable a hook, edit .claude/settings.json:
+    console.print(
+        Panel(
+            """To enable a hook, edit .claude/settings.json:
 
 {
   "hooks": {
@@ -187,29 +201,31 @@ def install_hooks(target_dir: Optional[Path] = None):
     }
   }
 }""",
-        title="Example Configuration",
-        border_style="green"
-    ))
+            title="Example Configuration",
+            border_style="green",
+        )
+    )
 
 
-def test_hooks(target_dir: Optional[Path] = None):
+def test_hooks(target_dir: Path | None = None):
     """Test QuickHooks PEP 723 hooks."""
     if target_dir is None:
         target_dir = Path.cwd()
 
-    console.print(f"\n[bold blue]Testing QuickHooks PEP 723 hooks in: {target_dir}[/bold blue]")
+    console.print(
+        f"\n[bold blue]Testing QuickHooks PEP 723 hooks in: {target_dir}[/bold blue]"
+    )
 
     hooks_dir = target_dir / ".claude" / "hooks"
 
     if not hooks_dir.exists():
         console.print(f"[red]❌ Hooks directory not found: {hooks_dir}[/red]")
         console.print("Run 'uv run -s setup_pep723_hooks.py install' first")
-        raise typer.Exit(1)
+        sys.exit(1)
 
     # Test each hook
     hook_files = [
         "example_hook_pep723.py",
-        "context_portal_hook_pep723.py",
     ]
 
     # Test agent analysis only if GROQ_API_KEY is set
@@ -224,7 +240,7 @@ def test_hooks(target_dir: Optional[Path] = None):
         "transcript_path": "",
         "cwd": str(target_dir),
         "prompt": "Write a Python function that sorts a list",
-        "context": ""
+        "context": "",
     }
 
     for hook_file in hook_files:
@@ -240,17 +256,18 @@ def test_hooks(target_dir: Optional[Path] = None):
             # Run hook with UV
             result = subprocess.run(
                 ["uv", "run", "-s", str(hook_path)],
+                check=False,
                 input=json.dumps(test_input),
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
 
             if result.returncode == 0:
                 # Parse response
                 try:
                     response = json.loads(result.stdout)
-                    console.print(f"  ✅ Status: Success")
+                    console.print("  ✅ Status: Success")
                     console.print(f"  📋 Response: {response}")
 
                     if result.stderr:
@@ -263,14 +280,14 @@ def test_hooks(target_dir: Optional[Path] = None):
                     console.print(f"  📝 Error: {result.stderr[:200]}")
 
         except subprocess.TimeoutExpired:
-            console.print(f"  ❌ Status: Timeout (>30s)")
+            console.print("  ❌ Status: Timeout (>30s)")
         except Exception as e:
             console.print(f"  ❌ Status: Error - {e}")
 
     console.print("\n[bold green]✅ Testing complete![/bold green]")
 
 
-def uninstall_hooks(target_dir: Optional[Path] = None):
+def uninstall_hooks(target_dir: Path | None = None):
     """Uninstall QuickHooks PEP 723 hooks."""
     if target_dir is None:
         target_dir = Path.cwd()
@@ -281,17 +298,21 @@ def uninstall_hooks(target_dir: Optional[Path] = None):
         console.print(f"[yellow]No hooks directory found at: {hooks_dir}[/yellow]")
         return
 
-    if not Confirm.ask(f"\n[bold red]Remove all QuickHooks hooks from {hooks_dir}?[/bold red]"):
+    if not Confirm.ask(
+        f"\n[bold red]Remove all QuickHooks hooks from {hooks_dir}?[/bold red]"
+    ):
         console.print("Uninstall cancelled.")
         return
 
-    console.print(f"\n[bold blue]Uninstalling QuickHooks PEP 723 hooks from: {target_dir}[/bold blue]")
+    console.print(
+        f"\n[bold blue]Uninstalling QuickHooks PEP 723 hooks from: "
+        f"{target_dir}[/bold blue]"
+    )
 
     # Remove hook files
     hook_files = [
         "example_hook_pep723.py",
         "agent_analysis_hook_pep723.py",
-        "context_portal_hook_pep723.py",
     ]
 
     for hook_file in hook_files:
@@ -302,33 +323,29 @@ def uninstall_hooks(target_dir: Optional[Path] = None):
 
     # Optionally remove settings.json
     settings_file = target_dir / ".claude" / "settings.json"
-    if settings_file.exists():
-        if Confirm.ask("\n[yellow]Remove .claude/settings.json?[/yellow]"):
-            settings_file.unlink()
-            console.print(f"✅ Removed: settings.json")
+    if settings_file.exists() and Confirm.ask(
+        "\n[yellow]Remove .claude/settings.json?[/yellow]"
+    ):
+        settings_file.unlink()
+        console.print("✅ Removed: settings.json")
 
     console.print("\n[bold green]✅ Uninstall complete![/bold green]")
 
 
-@app.command()
+@app.command
 def install(
-    target: Optional[str] = typer.Option(
-        None,
-        "--target",
-        "-t",
-        help="Target directory (default: current directory)"
+    target: str | None = Parameter(
+        None, "--target", "-t", help="Target directory (default: current directory)"
     ),
-    skip_check: bool = typer.Option(
-        False,
-        "--skip-check",
-        help="Skip requirements check"
-    ),
+    skip_check: bool = Parameter(False, "--skip-check", help="Skip requirements check"),
 ):
     """Install QuickHooks PEP 723 hooks to Claude Code project."""
-    console.print(Panel.fit(
-        "[bold blue]QuickHooks PEP 723 Hooks - Installation[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]QuickHooks PEP 723 Hooks - Installation[/bold blue]",
+            border_style="blue",
+        )
+    )
 
     # Check requirements
     if not skip_check:
@@ -338,68 +355,73 @@ def install(
         if not checks.get("uv_installed"):
             console.print("\n[red]❌ UV is required but not installed[/red]")
             console.print("\nInstall UV:")
-            console.print("  macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh")
-            console.print("  Windows: powershell -ExecutionPolicy ByPass -c \"irm https://astral.sh/uv/install.ps1 | iex\"")
-            raise typer.Exit(1)
+            console.print(
+                "  macOS/Linux: curl -LsSf https://astral.sh/uv/install.sh | sh"
+            )
+            console.print(
+                "  Windows: powershell -ExecutionPolicy ByPass -c "
+                '"irm https://astral.sh/uv/install.ps1 | iex"'
+            )
+            sys.exit(1)
 
         if not checks.get("python_version"):
             console.print("\n[red]❌ Python 3.12+ is required[/red]")
-            raise typer.Exit(1)
+            sys.exit(1)
 
         if not Confirm.ask("\nProceed with installation?"):
             console.print("Installation cancelled.")
-            raise typer.Exit(0)
+            sys.exit(0)
 
     # Install hooks
     target_dir = Path(target) if target else None
     install_hooks(target_dir)
 
 
-@app.command()
+@app.command
 def test(
-    target: Optional[str] = typer.Option(
-        None,
-        "--target",
-        "-t",
-        help="Target directory (default: current directory)"
+    target: str | None = Parameter(
+        None, "--target", "-t", help="Target directory (default: current directory)"
     ),
 ):
     """Test QuickHooks PEP 723 hooks."""
-    console.print(Panel.fit(
-        "[bold blue]QuickHooks PEP 723 Hooks - Testing[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]QuickHooks PEP 723 Hooks - Testing[/bold blue]",
+            border_style="blue",
+        )
+    )
 
     target_dir = Path(target) if target else None
     test_hooks(target_dir)
 
 
-@app.command()
+@app.command
 def uninstall(
-    target: Optional[str] = typer.Option(
-        None,
-        "--target",
-        "-t",
-        help="Target directory (default: current directory)"
+    target: str | None = Parameter(
+        None, "--target", "-t", help="Target directory (default: current directory)"
     ),
 ):
     """Uninstall QuickHooks PEP 723 hooks."""
-    console.print(Panel.fit(
-        "[bold blue]QuickHooks PEP 723 Hooks - Uninstall[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]QuickHooks PEP 723 Hooks - Uninstall[/bold blue]",
+            border_style="blue",
+        )
+    )
 
     target_dir = Path(target) if target else None
     uninstall_hooks(target_dir)
 
 
-@app.command()
+@app.command
 def check():
     """Check system requirements for QuickHooks PEP 723 hooks."""
-    console.print(Panel.fit(
-        "[bold blue]QuickHooks PEP 723 Hooks - Requirements Check[/bold blue]",
-        border_style="blue"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold blue]QuickHooks PEP 723 Hooks - Requirements Check[/bold blue]",
+            border_style="blue",
+        )
+    )
 
     display_requirements_check()
 

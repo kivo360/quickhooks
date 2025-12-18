@@ -40,7 +40,8 @@ class ParallelHook(BaseHook):
         Subclasses should implement this method to define how to break
         down the hook input into parallel processing tasks.
         """
-        raise NotImplementedError("Subclasses must implement create_processing_tasks")
+        msg = "Subclasses must implement create_processing_tasks"
+        raise NotImplementedError(msg)
 
     async def aggregate_results(self, results: list[Any]) -> HookOutput:
         """Aggregate results from parallel tasks into final output.
@@ -48,7 +49,8 @@ class ParallelHook(BaseHook):
         Subclasses should implement this method to define how to combine
         results from multiple parallel tasks.
         """
-        raise NotImplementedError("Subclasses must implement aggregate_results")
+        msg = "Subclasses must implement aggregate_results"
+        raise NotImplementedError(msg)
 
     async def execute_parallel(
         self, input_data: HookInput, mode: ProcessingMode = ProcessingMode.PARALLEL
@@ -76,22 +78,21 @@ class ParallelHook(BaseHook):
             # Aggregate results
             if successful_results:
                 return await self.aggregate_results(successful_results)
-            else:
-                # All tasks failed
-                error_messages = [
-                    r.execution_result.stderr for r in results if not r.success
-                ]
-                return HookOutput(
-                    allowed=False,
-                    modified_input=input_data.tool_input,
-                    message=f"All parallel tasks failed: {'; '.join(error_messages)}",
-                )
+            # All tasks failed
+            error_messages = [
+                r.execution_result.stderr for r in results if not r.success
+            ]
+            return HookOutput(
+                allowed=False,
+                modified_input=input_data.tool_input,
+                message=f"All parallel tasks failed: {'; '.join(error_messages)}",
+            )
 
         except Exception as e:
             return HookOutput(
                 allowed=False,
                 modified_input=input_data.tool_input,
-                message=f"Parallel execution failed: {str(e)}",
+                message=f"Parallel execution failed: {e!s}",
             )
 
     async def execute(self, input_data: HookInput) -> HookOutput:
@@ -202,12 +203,14 @@ class DataParallelHook(ParallelHook):
     ) -> list[ProcessingTask]:
         """Create tasks for each data chunk."""
         if not self.processor_hook_path:
-            raise ValueError("Processor hook path not set")
+            msg = "Processor hook path not set"
+            raise ValueError(msg)
 
         # Extract data to process from input
         data_to_process = input_data.tool_input.get("data", [])
         if not isinstance(data_to_process, list):
-            raise ValueError("Data must be a list for parallel processing")
+            msg = "Data must be a list for parallel processing"
+            raise ValueError(msg)
 
         # Split data into chunks
         chunks = self.chunk_data(data_to_process)

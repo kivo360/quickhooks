@@ -19,7 +19,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from pydantic import BaseModel
 from rich.console import Console
 from rich.panel import Panel
@@ -98,9 +99,8 @@ class DeploymentAgent:
                     f"[green]Agent {self.name}[/green]: {task_name} completed"
                 )
                 return True, stdout.decode()
-            else:
-                self.console.print(f"[red]Agent {self.name}[/red]: {task_name} failed")
-                return False, stderr.decode()
+            self.console.print(f"[red]Agent {self.name}[/red]: {task_name} failed")
+            return False, stderr.decode()
 
         except Exception as e:
             self.console.print(
@@ -339,7 +339,7 @@ class DeploymentOrchestrator:
             if isinstance(result, Exception):
                 self.result.errors.append(f"Parallel task {i} failed: {result}")
                 return False
-            elif not result:
+            if not result:
                 return False
 
         # Run validation after build completes
@@ -427,26 +427,26 @@ class DeploymentOrchestrator:
         return self.result
 
 
-app = typer.Typer(help="QuickHooks Deployment System")
+app = cyclopts.App(help="QuickHooks Deployment System")
 
 
-@app.command()
+@app.command
 def deploy(
-    environment: Environment = typer.Option(  # noqa: B008
+    environment: Environment = Parameter(
         Environment.DEV, "--env", "-e", help="Deployment environment"
     ),
-    version_bump: VersionBump | None = typer.Option(  # noqa: B008
+    version_bump: VersionBump | None = Parameter(
         None, "--version", "-v", help="Version bump type"
     ),
-    publish: bool = typer.Option(False, "--publish", "-p", help="Publish to PyPI"),
-    skip_tests: bool = typer.Option(False, "--skip-tests", help="Skip test execution"),
-    skip_validation: bool = typer.Option(
+    publish: bool = Parameter(False, "--publish", "-p", help="Publish to PyPI"),
+    skip_tests: bool = Parameter(False, "--skip-tests", help="Skip test execution"),
+    skip_validation: bool = Parameter(
         False, "--skip-validation", help="Skip build validation"
     ),
-    sequential: bool = typer.Option(
+    sequential: bool = Parameter(
         False, "--sequential", help="Disable parallel agents"
     ),
-    dry_run: bool = typer.Option(
+    dry_run: bool = Parameter(
         False, "--dry-run", help="Show what would be done without executing"
     ),
 ):
@@ -466,7 +466,7 @@ def deploy(
             console.print(f"[green]Version bumped to: {new_version}[/green]")
         except Exception as e:
             console.print(f"[red]Version bump failed: {e}[/red]")
-            raise typer.Exit(1)
+            sys.exit(1)
     else:
         # Get current version
         temp_config = DeploymentConfig(
@@ -550,7 +550,7 @@ def status():
 
     except Exception as e:
         console.print(f"[red]Status check failed: {e}[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

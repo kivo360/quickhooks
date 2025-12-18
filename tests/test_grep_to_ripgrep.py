@@ -233,6 +233,7 @@ class TestHookIntegration:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
 
         assert process.returncode == 0, f"Hook failed: {process.stderr}"
@@ -335,6 +336,7 @@ class TestHookIntegration:
             capture_output=True,
             text=True,
             timeout=10,
+            check=False,
         )
 
         # Should exit successfully but allow original command

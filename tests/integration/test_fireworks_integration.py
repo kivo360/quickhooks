@@ -16,8 +16,8 @@ async def test_fireworks_integration() -> None:
 
     # Check configuration
     config = get_config()
-    print(f"\nConfiguration loaded:")
-    print(f"  AI Provider: Fireworks AI")
+    print("\nConfiguration loaded:")
+    print("  AI Provider: Fireworks AI")
     print(f"  LLM Model: {config.ai.llm}")
     print(f"  VLM Model: {config.ai.vlm}")
     print(f"  Base URL: {config.ai.base_url}")

@@ -5,6 +5,7 @@ Following TDD principles - tests are written first.
 """
 
 import asyncio
+import contextlib
 
 import pytest
 
@@ -308,12 +309,11 @@ class TestBaseHookExecution:
             ) -> HookOutput:
                 if input_data.event_type == "value_error":
                     raise ValueError("Value error occurred")
-                elif input_data.event_type == "type_error":
+                if input_data.event_type == "type_error":
                     raise TypeError("Type error occurred")
-                elif input_data.event_type == "runtime_error":
+                if input_data.event_type == "runtime_error":
                     raise RuntimeError("Runtime error occurred")
-                else:
-                    return HookOutput(status=HookStatus.SUCCESS, data={})
+                return HookOutput(status=HookStatus.SUCCESS, data={})
 
         hook = ExceptionHook()
         context = ExecutionContext(
@@ -434,11 +434,8 @@ class TestHookConcurrency:
         await asyncio.sleep(0.05)
         task.cancel()
 
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            # This is expected
-            pass
 
         # The task should be cancelled
         assert task.cancelled()

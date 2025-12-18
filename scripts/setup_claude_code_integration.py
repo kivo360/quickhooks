@@ -12,16 +12,18 @@ Usage:
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 
-import typer
+import cyclopts
+from cyclopts import Parameter
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 console = Console()
-app = typer.Typer(help="Setup QuickHooks Agent Analysis integration with Claude Code")
+app = cyclopts.App(help="Setup QuickHooks Agent Analysis integration with Claude Code")
 
 
 def check_requirements() -> dict[str, bool]:
@@ -285,12 +287,12 @@ def test_setup():
         return False
 
 
-@app.command()
+@app.command
 def setup(
-    skip_check: bool = typer.Option(
+    skip_check: bool = Parameter(
         False, "--skip-check", help="Skip requirements check"
     ),
-    test: bool = typer.Option(True, "--test/--no-test", help="Run test after setup"),
+    test: bool = Parameter(True, "--test/--no-test", help="Run test after setup"),
 ):
     """Set up QuickHooks Agent Analysis integration with Claude Code."""
 
@@ -331,11 +333,11 @@ def setup(
             if "Required dependencies" in critical_missing:
                 console.print("   pip install chromadb sentence-transformers groq")
 
-            raise typer.Exit(1)
+            sys.exit(1)
 
         if not Confirm.ask("\nProceed with setup?"):
             console.print("Setup cancelled.")
-            raise typer.Exit(0)
+            sys.exit(0)
 
     # Setup directories
     setup_directories()
@@ -343,12 +345,12 @@ def setup(
     # Copy hook script
     if not copy_hook_script():
         console.print("[red]❌ Failed to copy hook script[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
     # Create settings
     if not create_settings_json():
         console.print("[red]❌ Failed to create settings[/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
     # Test setup
     if test:
@@ -376,7 +378,7 @@ def setup(
     console.print("   • Sample agent: ~/.claude/agents/sample_coding_agent.py")
 
 
-@app.command()
+@app.command
 def test():
     """Test the agent analysis setup."""
     console.print("Testing QuickHooks Agent Analysis setup...")
@@ -385,7 +387,7 @@ def test():
         console.print("[bold green]✅ Test passed![/bold green]")
     else:
         console.print("[red]❌ Test failed![/red]")
-        raise typer.Exit(1)
+        sys.exit(1)
 
 
 @app.command()

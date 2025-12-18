@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.progress import Progress, TaskID
 
 from .instruction_parser import AgentOSInstruction, InstructionParser
-from ..models import HookInput, HookOutput, HookResult, HookStatus, HookError, ExecutionContext
+from ..models import HookOutput, HookResult, HookStatus
 
 console = Console()
 
@@ -38,34 +38,6 @@ class AgentOSExecutor:
         self.working_directory = working_directory or Path.cwd()
         self.verbose = verbose
         self.parser = InstructionParser(self.agent_os_path)
-        print(f"DEBUG: Executor initialized with agent_os_path: {self.agent_os_path}")
-        print(f"DEBUG: Executor parser instructions_path: {self.parser.instructions_path}")
-
-    def _create_hook_result(
-        self,
-        status: HookStatus,
-        data: Optional[Dict[str, Any]] = None,
-        message: Optional[str] = None,
-        error: Optional[HookError] = None,
-        hook_id: str = "agent-os-executor",
-    ) -> HookResult:
-        """Create a properly structured HookResult."""
-        return HookResult(
-            hook_id=hook_id,
-            status=status,
-            input_data=HookInput(event_type="agent_execution", data={}),
-            output_data=HookOutput(
-                status=status,
-                data=data or {},
-                message=message,
-                error=error,
-            ),
-            execution_context=ExecutionContext(
-                hook_id=hook_id,
-                execution_id=f"exec-{hash(str(status))}",
-                environment="development"
-            )
-        )
 
     async def execute_instruction(
         self,
@@ -90,12 +62,11 @@ class AgentOSExecutor:
                 instruction_name, category
             )
             if not instruction:
-                return self._create_hook_result(
+                return HookResult(
                     status=HookStatus.FAILED,
-                    error=HookError(
-                        code="INSTRUCTION_NOT_FOUND",
-                        message=f"Instruction '{instruction_name}' not found"
-                    )
+                    output=HookOutput(
+                        error=f"Instruction '{instruction_name}' not found"
+                    ),
                 )
 
             if self.verbose:
@@ -144,49 +115,43 @@ class AgentOSExecutor:
 
             # Determine overall success
             overall_success = all(
-                result.status == HookStatus.SUCCESS for result in step_results
+                result.status == HookStatus.SUCCEEDED for result in step_results
             )
 
-            return self._create_hook_result(
-                status=HookStatus.SUCCESS if overall_success else HookStatus.FAILED,
-                data={
-                    "instruction": instruction_name,
-                    "category": category,
-                    "steps_completed": len(
-                        [
-                            r
-                            for r in step_results
-                            if r.status == HookStatus.SUCCESS
-                        ]
-                    ),
-                    "total_steps": len(instruction.process_flow.steps),
-                    "step_results": [
-                        {
-                            "name": step["name"],
-                            "status": result.status,
-                            "output": result.output_data.data
-                            if result.output_data and result.output_data.data
-                            else None,
-                        }
-                        for step, result in zip(
-                            instruction.process_flow.steps, step_results
-                        )
-                    ],
-                }
+            return HookResult(
+                status=HookStatus.SUCCEEDED if overall_success else HookStatus.FAILED,
+                output=HookOutput(
+                    data={
+                        "instruction": instruction_name,
+                        "category": category,
+                        "steps_completed": len(
+                            [
+                                r
+                                for r in step_results
+                                if r.status == HookStatus.SUCCEEDED
+                            ]
+                        ),
+                        "total_steps": len(instruction.process_flow.steps),
+                        "step_results": [
+                            {
+                                "name": step["name"],
+                                "status": result.status.value,
+                                "output": result.output.data
+                                if result.output and result.output.data
+                                else None,
+                            }
+                            for step, result in zip(
+                                instruction.process_flow.steps, step_results
+                            )
+                        ],
+                    }
+                ),
             )
 
         except Exception as e:
-            if self.verbose:
-                console.print(f"[red]Execution exception: {e}[/red]")
-                console.print(f"[red]Exception type: {type(e)}[/red]")
-                import traceback
-                console.print(f"[red]Traceback: {traceback.format_exc()}[/red]")
-            return self._create_hook_result(
+            return HookResult(
                 status=HookStatus.FAILED,
-                error=HookError(
-                    code="EXECUTION_ERROR",
-                    message=f"Execution failed: {str(e)}"
-                )
+                output=HookOutput(error=f"Execution failed: {str(e)}"),
             )
 
     async def _execute_step(
@@ -221,13 +186,9 @@ class AgentOSExecutor:
             return agent_result
 
         except Exception as e:
-            return self._create_hook_result(
+            return HookResult(
                 status=HookStatus.FAILED,
-                error=HookError(
-                    code="STEP_ERROR",
-                    message=f"Step '{step['name']}' failed: {str(e)}"
-                ),
-                hook_id=f"step-{step['name']}"
+                output=HookOutput(error=f"Step '{step['name']}' failed: {str(e)}"),
             )
 
     async def _execute_agent(
@@ -259,15 +220,16 @@ class AgentOSExecutor:
         # Simulate agent work
         await asyncio.sleep(0.1)
 
-        return self._create_hook_result(
-            status=HookStatus.SUCCESS,
-            data={
-                "agent": agent_name,
-                "step": step["name"],
-                "execution_time": 0.1,
-                "mock_execution": True,
-            },
-            hook_id=f"agent-{agent_name}"
+        return HookResult(
+            status=HookStatus.SUCCEEDED,
+            output=HookOutput(
+                data={
+                    "agent": agent_name,
+                    "step": step["name"],
+                    "execution_time": 0.1,
+                    "mock_execution": True,
+                }
+            ),
         )
 
     async def _execute_check(
@@ -307,20 +269,15 @@ class AgentOSExecutor:
                     console.print(f"[dim]Executing check:[/dim] {command_ref}")
 
             # Mock successful check for now
-            return self._create_hook_result(
-                status=HookStatus.SUCCESS,
-                data={"check": check_command, "passed": True},
-                hook_id="check-execution"
+            return HookResult(
+                status=HookStatus.SUCCEEDED,
+                output=HookOutput(data={"check": check_command, "passed": True}),
             )
 
         except Exception as e:
-            return self._create_hook_result(
+            return HookResult(
                 status=HookStatus.FAILED,
-                error=HookError(
-                    code="CHECK_ERROR",
-                    message=f"Check failed: {str(e)}"
-                ),
-                hook_id="check-execution"
+                output=HookOutput(error=f"Check failed: {str(e)}"),
             )
 
     async def execute_workflow(
@@ -355,24 +312,25 @@ class AgentOSExecutor:
                 break
 
         overall_success = all(
-            r["result"].status == HookStatus.SUCCESS for r in workflow_results
+            r["result"].status == HookStatus.SUCCEEDED for r in workflow_results
         )
 
-        return self._create_hook_result(
-            status=HookStatus.SUCCESS if overall_success else HookStatus.FAILED,
-            data={
-                "workflow": workflow_name,
-                "instructions_completed": len(
-                    [
-                        r
-                        for r in workflow_results
-                        if r["result"].status == HookStatus.SUCCESS
-                    ]
-                ),
-                "total_instructions": len(instructions),
-                "results": workflow_results,
-            },
-            hook_id=f"workflow-{workflow_name}"
+        return HookResult(
+            status=HookStatus.SUCCEEDED if overall_success else HookStatus.FAILED,
+            output=HookOutput(
+                data={
+                    "workflow": workflow_name,
+                    "instructions_completed": len(
+                        [
+                            r
+                            for r in workflow_results
+                            if r["result"].status == HookStatus.SUCCEEDED
+                        ]
+                    ),
+                    "total_instructions": len(instructions),
+                    "results": workflow_results,
+                }
+            ),
         )
 
     def list_available_instructions(self, category: Optional[str] = None) -> List[str]:

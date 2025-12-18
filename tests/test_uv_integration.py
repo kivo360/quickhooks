@@ -39,6 +39,7 @@ def test_uv_availability():
                     capture_output=True,
                     text=True,
                     timeout=5,
+                    check=False,
                 )
                 if result.returncode == 0:
                     print(f"Version check: ✅ {result.stdout.strip()}")

@@ -16,8 +16,8 @@ def test_fireworks_provider_setup() -> None:
 
     # Check configuration
     config = get_config()
-    print(f"\n1. Configuration loaded:")
-    print(f"   ✓ AI Provider: Fireworks AI")
+    print("\n1. Configuration loaded:")
+    print("   ✓ AI Provider: Fireworks AI")
     print(f"   ✓ LLM Model: {config.ai.llm}")
     print(f"   ✓ VLM Model: {config.ai.vlm}")
     print(f"   ✓ Tool Calls Enabled: {config.ai.enable_tool_calls}")
@@ -34,7 +34,7 @@ def test_fireworks_provider_setup() -> None:
     print("\n2. Testing FireworksProvider initialization:")
     try:
         provider = FireworksProvider(api_key=api_key)
-        print(f"   ✓ FireworksProvider created successfully")
+        print("   ✓ FireworksProvider created successfully")
         print(f"   ✓ Provider name: {provider.name}")
         print(f"   ✓ Base URL: {provider.base_url}")
         print(f"   ✓ Client type: {type(provider.client).__name__}")
@@ -65,13 +65,13 @@ def test_fireworks_provider_setup() -> None:
             config.ai.llm,
             provider=provider,
         )
-        print(f"   ✓ OpenAIModel created successfully")
+        print("   ✓ OpenAIModel created successfully")
         print(f"   ✓ Model name: {config.ai.llm}")
-        print(f"   ✓ Provider configured: FireworksProvider")
+        print("   ✓ Provider configured: FireworksProvider")
 
         # Check if the profile supports tools
         profile = provider.model_profile(config.ai.llm)
-        if profile and hasattr(profile, 'supports_tools'):
+        if profile and hasattr(profile, "supports_tools"):
             print(f"   ✓ Tools supported: {profile.supports_tools}")
             print(f"   ✓ Default output mode: {profile.default_structured_output_mode}")
     except Exception as e:

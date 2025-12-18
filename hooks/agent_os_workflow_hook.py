@@ -18,7 +18,7 @@ from Claude Code prompts.
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 # Add QuickHooks to path if needed
 try:
@@ -29,10 +29,12 @@ except ImportError:
     quickhooks_path = Path.home() / ".quickhooks" / "src"
     if quickhooks_path.exists():
         sys.path.insert(0, str(quickhooks_path))
-        from quickhooks.agent_os.hooks import AgentOSHook, AgentOSPrePostHook
-        from quickhooks.models import HookInput, HookOutput, HookResult, HookStatus
+        from quickhooks.agent_os.hooks import AgentOSHook
+        from quickhooks.models import HookInput
     else:
-        print("QuickHooks not found. Please install QuickHooks with Agent OS dependencies.")
+        print(
+            "QuickHooks not found. Please install QuickHooks with Agent OS dependencies."
+        )
         sys.exit(1)
 
 
@@ -50,7 +52,7 @@ class AgentOSWorkflowHook:
             os.getenv("QUICKHOOKS_AGENT_OS_VERBOSE", "false").lower() == "true"
         )
 
-    def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """
         Run the Agent OS workflow hook.
 
@@ -64,7 +66,7 @@ class AgentOSWorkflowHook:
             return {
                 "status": "skipped",
                 "message": "Agent OS hook is disabled",
-                "output": None
+                "output": None,
             }
 
         try:
@@ -79,7 +81,7 @@ class AgentOSWorkflowHook:
                 return {
                     "status": "skipped",
                     "message": "No Agent OS intent detected",
-                    "output": None
+                    "output": None,
                 }
 
             # Convert to HookInput format
@@ -90,30 +92,29 @@ class AgentOSWorkflowHook:
                     "verbose": self.verbose,
                     "working_directory": Path.cwd(),
                     "agent_os_path": Path(self.agent_os_path).expanduser(),
-                    "prompt": prompt
-                }
+                    "prompt": prompt,
+                },
             )
 
             # Execute appropriate Agent OS action
             if agent_os_intent["type"] == "instruction":
                 return self._execute_instruction(agent_os_intent, hook_input)
-            elif agent_os_intent["type"] == "workflow":
+            if agent_os_intent["type"] == "workflow":
                 return self._execute_workflow(agent_os_intent, hook_input)
-            else:
-                return {
-                    "status": "skipped",
-                    "message": f"Unknown Agent OS intent type: {agent_os_intent['type']}",
-                    "output": None
-                }
+            return {
+                "status": "skipped",
+                "message": f"Unknown Agent OS intent type: {agent_os_intent['type']}",
+                "output": None,
+            }
 
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Agent OS hook execution failed: {str(e)}",
-                "output": None
+                "message": f"Agent OS hook execution failed: {e!s}",
+                "output": None,
             }
 
-    def _detect_agent_os_intent(self, prompt: str) -> Dict[str, Any]:
+    def _detect_agent_os_intent(self, prompt: str) -> dict[str, Any]:
         """
         Detect Agent OS intent in the user's prompt.
 
@@ -127,8 +128,13 @@ class AgentOSWorkflowHook:
 
         # Check for explicit Agent OS instruction mentions
         agent_os_keywords = [
-            "plan-product", "create-spec", "execute-task", "execute-tasks",
-            "analyze-product", "agent os", "agent-os"
+            "plan-product",
+            "create-spec",
+            "execute-task",
+            "execute-tasks",
+            "analyze-product",
+            "agent os",
+            "agent-os",
         ]
 
         for keyword in agent_os_keywords:
@@ -137,7 +143,7 @@ class AgentOSWorkflowHook:
                     "type": "instruction",
                     "instruction": keyword,
                     "category": self._infer_category(prompt),
-                    "confidence": 0.9
+                    "confidence": 0.9,
                 }
 
         # Check for workflow patterns
@@ -147,7 +153,7 @@ class AgentOSWorkflowHook:
             ("analyze the product", "analyze-product"),
             ("execute tasks", "execute-tasks"),
             ("product planning", "plan-product"),
-            ("spec creation", "create-spec")
+            ("spec creation", "create-spec"),
         ]
 
         for pattern, instruction in workflow_patterns:
@@ -156,7 +162,7 @@ class AgentOSWorkflowHook:
                     "type": "instruction",
                     "instruction": instruction,
                     "category": self._infer_category(prompt),
-                    "confidence": 0.8
+                    "confidence": 0.8,
                 }
 
         # Check for multi-step workflows
@@ -164,7 +170,7 @@ class AgentOSWorkflowHook:
             "plan and then create",
             "analyze then execute",
             "from idea to implementation",
-            "end-to-end development"
+            "end-to-end development",
         ]
 
         for indicator in multi_step_indicators:
@@ -172,7 +178,7 @@ class AgentOSWorkflowHook:
                 return {
                     "type": "workflow",
                     "workflow": self._infer_workflow(prompt),
-                    "confidence": 0.7
+                    "confidence": 0.7,
                 }
 
         return None
@@ -191,13 +197,17 @@ class AgentOSWorkflowHook:
 
         # Core instructions are about product development
         core_keywords = [
-            "plan", "create", "execute", "analyze", "spec", "product", "feature"
+            "plan",
+            "create",
+            "execute",
+            "analyze",
+            "spec",
+            "product",
+            "feature",
         ]
 
         # Meta instructions are about Agent OS itself
-        meta_keywords = [
-            "agent", "workflow", "instruction", "meta", "system"
-        ]
+        meta_keywords = ["agent", "workflow", "instruction", "meta", "system"]
 
         core_score = sum(1 for keyword in core_keywords if keyword in prompt_lower)
         meta_score = sum(1 for keyword in meta_keywords if keyword in prompt_lower)
@@ -218,19 +228,20 @@ class AgentOSWorkflowHook:
 
         if any(word in prompt_lower for word in ["plan", "idea", "concept"]):
             return "product-planning"
-        elif any(word in prompt_lower for word in ["develop", "implement", "feature"]):
+        if any(word in prompt_lower for word in ["develop", "implement", "feature"]):
             return "feature-development"
-        else:
-            return "product-planning"  # Default workflow
+        return "product-planning"  # Default workflow
 
-    async def _execute_instruction(self, intent: Dict[str, Any], hook_input: HookInput) -> Dict[str, Any]:
+    async def _execute_instruction(
+        self, intent: dict[str, Any], hook_input: HookInput
+    ) -> dict[str, Any]:
         """Execute an Agent OS instruction."""
         try:
             # Create Agent OS hook
             hook = AgentOSHook(
                 instruction=intent["instruction"],
                 category=intent["category"],
-                agent_os_path=str(hook_input.context.get("agent_os_path"))
+                agent_os_path=str(hook_input.context.get("agent_os_path")),
             )
 
             # Execute the hook
@@ -242,24 +253,26 @@ class AgentOSWorkflowHook:
                 "output": result.output.data if result.output else None,
                 "agent_os_instruction": intent["instruction"],
                 "agent_os_category": intent["category"],
-                "confidence": intent["confidence"]
+                "confidence": intent["confidence"],
             }
 
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Failed to execute Agent OS instruction: {str(e)}",
+                "message": f"Failed to execute Agent OS instruction: {e!s}",
                 "output": None,
-                "agent_os_instruction": intent["instruction"]
+                "agent_os_instruction": intent["instruction"],
             }
 
-    async def _execute_workflow(self, intent: Dict[str, Any], hook_input: HookInput) -> Dict[str, Any]:
+    async def _execute_workflow(
+        self, intent: dict[str, Any], hook_input: HookInput
+    ) -> dict[str, Any]:
         """Execute an Agent OS workflow."""
         try:
             # Create Agent OS hook for workflow
             hook = AgentOSHook(
                 workflow=intent["workflow"],
-                agent_os_path=str(hook_input.context.get("agent_os_path"))
+                agent_os_path=str(hook_input.context.get("agent_os_path")),
             )
 
             # Execute the hook
@@ -270,30 +283,29 @@ class AgentOSWorkflowHook:
                 "message": f"Executed Agent OS workflow: {intent['workflow']}",
                 "output": result.output.data if result.output else None,
                 "agent_os_workflow": intent["workflow"],
-                "confidence": intent["confidence"]
+                "confidence": intent["confidence"],
             }
 
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Failed to execute Agent OS workflow: {str(e)}",
+                "message": f"Failed to execute Agent OS workflow: {e!s}",
                 "output": None,
-                "agent_os_workflow": intent["workflow"]
+                "agent_os_workflow": intent["workflow"],
             }
 
 
 # Hook entry point for Claude Code
-def run(input_data: Dict[str, Any]) -> Dict[str, Any]:
+def run(input_data: dict[str, Any]) -> dict[str, Any]:
     """Entry point for Claude Code hook execution."""
     import asyncio
 
     hook = AgentOSWorkflowHook()
 
     # If the hook method is async, run it in the event loop
-    if hasattr(hook.run, '__await__'):
+    if hasattr(hook.run, "__await__"):
         return asyncio.run(hook.run(input_data))
-    else:
-        return hook.run(input_data)
+    return hook.run(input_data)
 
 
 # Example usage and testing
@@ -303,8 +315,8 @@ if __name__ == "__main__":
         "prompt": "Plan the product for a new task management app",
         "context": {
             "project_type": "web application",
-            "tech_stack": ["python", "fastapi", "react"]
-        }
+            "tech_stack": ["python", "fastapi", "react"],
+        },
     }
 
     result = run(test_input)

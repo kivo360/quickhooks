@@ -146,13 +146,9 @@ class AIConfig(BaseSettings):
     Configures AI provider, models, and agent behavior for QuickHooks.
     """
 
-    model_config = SettingsConfigDict(
-        env_prefix="FIREWORKS_", case_sensitive=False
-    )
+    model_config = SettingsConfigDict(env_prefix="FIREWORKS_", case_sensitive=False)
 
-    api_key: str | None = Field(
-        default=None, description="Fireworks AI API key"
-    )
+    api_key: str | None = Field(default=None, description="Fireworks AI API key")
     llm: str = Field(
         default="accounts/fireworks/models/glm-4p6",
         description="Fireworks LLM model for text generation and tool calls",
@@ -194,7 +190,7 @@ class QuickHooksConfig(BaseSettings):
 
     # Application metadata
     app_name: str = Field(default="QuickHooks", description="Application name")
-    version: str = Field(default="0.1.0", description="Application version")
+    version: str = Field(default="0.2.0", description="Application version")
     environment: Environment = Field(
         default=Environment.DEVELOPMENT, description="Deployment environment"
     )
@@ -227,7 +223,8 @@ class QuickHooksConfig(BaseSettings):
     def validate_secret_key(cls, v: str) -> str:
         """Validate secret key meets security requirements."""
         if len(v) < 32:
-            raise ValueError("Secret key must be at least 32 characters long")
+            msg = "Secret key must be at least 32 characters long"
+            raise ValueError(msg)
         return v
 
     @property
@@ -319,7 +316,7 @@ def reload_config() -> QuickHooksConfig:
 
 def get_global_hooks_dir() -> Path:
     """Get the global hooks directory path.
-    
+
     Returns:
         Path: Path to the global hooks directory
     """
@@ -327,7 +324,7 @@ def get_global_hooks_dir() -> Path:
     env_dir = os.getenv("QUICKHOOKS_GLOBAL_DIR")
     if env_dir:
         return Path(env_dir)
-    
+
     # Default to user's home directory
     home_dir = Path.home()
     return home_dir / ".quickhooks" / "hooks"
@@ -335,7 +332,7 @@ def get_global_hooks_dir() -> Path:
 
 def get_global_config_dir() -> Path:
     """Get the global configuration directory path.
-    
+
     Returns:
         Path: Path to the global configuration directory
     """
@@ -343,7 +340,7 @@ def get_global_config_dir() -> Path:
     env_dir = os.getenv("QUICKHOOKS_GLOBAL_CONFIG_DIR")
     if env_dir:
         return Path(env_dir)
-    
+
     # Default to user's home directory
     home_dir = Path.home()
     return home_dir / ".quickhooks" / "config"

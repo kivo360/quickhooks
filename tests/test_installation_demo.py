@@ -195,6 +195,7 @@ if __name__ == '__main__':
                 capture_output=True,
                 text=True,
                 cwd=temp_dir,
+                check=False,
             )
 
             if result.returncode == 0:

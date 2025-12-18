@@ -6,13 +6,13 @@ framework.
 """
 
 from .executor import AgentOSExecutor
+from .hooks import AgentOSHook
 from .instruction_parser import InstructionParser
 from .workflow_manager import WorkflowManager
-from .hooks import AgentOSHook
 
 __all__ = [
     "AgentOSExecutor",
+    "AgentOSHook",
     "InstructionParser",
     "WorkflowManager",
-    "AgentOSHook",
 ]

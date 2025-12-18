@@ -6,37 +6,35 @@ converting them into executable workflows within QuickHooks.
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
-from ..utils.jinja_utils import render_template
 
 
 class ProcessFlow(BaseModel):
     """Represents a process flow from Agent OS instructions."""
 
-    steps: List[Dict[str, Any]] = Field(default_factory=list)
-    pre_flight_check: Optional[str] = None
-    post_flight_check: Optional[str] = None
+    steps: list[dict[str, Any]] = Field(default_factory=list)
+    pre_flight_check: str | None = None
+    post_flight_check: str | None = None
 
 
 class AgentOSInstruction(BaseModel):
     """Represents a parsed Agent OS instruction."""
 
     description: str
-    globs: Dict[str, Any] = Field(default_factory=dict)
+    globs: dict[str, Any] = Field(default_factory=dict)
     version: str = "1.0"
     encoding: str = "UTF-8"
     process_flow: ProcessFlow = Field(default_factory=ProcessFlow)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     raw_content: str = ""
 
 
 class InstructionParser:
     """Parses Agent OS instruction files into executable workflows."""
 
-    def __init__(self, agent_os_path: Optional[Path] = None):
+    def __init__(self, agent_os_path: Path | None = None):
         """
         Initialize the instruction parser.
 
@@ -58,10 +56,12 @@ class InstructionParser:
         Returns:
             Parsed instruction object
         """
-        content = file_path.read_text(encoding='utf-8')
+        content = file_path.read_text(encoding="utf-8")
         return self.parse_instruction_content(content, file_path)
 
-    def parse_instruction_content(self, content: str, source_path: Optional[Path] = None) -> AgentOSInstruction:
+    def parse_instruction_content(
+        self, content: str, source_path: Path | None = None
+    ) -> AgentOSInstruction:
         """
         Parse Agent OS instruction content.
 
@@ -73,12 +73,12 @@ class InstructionParser:
             Parsed instruction object
         """
         # Extract description from first non-empty line
-        lines = content.strip().split('\n')
-        description = lines[0] if lines else 'No description available'
+        lines = content.strip().split("\n")
+        description = lines[0] if lines else "No description available"
 
         # Extract sub-instructions (references to other files)
         sub_instructions = []
-        step_matches = re.finditer(r'{{[^}]*\.md}}', content)
+        step_matches = re.finditer(r"{{[^}]*\.md}}", content)
         for match in step_matches:
             sub_instructions.append(match.group(0))
 
@@ -86,20 +86,22 @@ class InstructionParser:
         steps = []
         for i, instruction_ref in enumerate(sub_instructions):
             # Clean up the reference (remove {{ }} and @ references)
-            clean_ref = instruction_ref.replace('{{', '').replace('}}', '').strip()
+            clean_ref = instruction_ref.replace("{{", "").replace("}}", "").strip()
 
-            steps.append({
-                'number': i + 1,
-                'subagent': 'agent',
-                'name': f"step_{i + 1}",
-                'title': f"Step {i + 1}",
-                'content': clean_ref,
-                'data_sources': {},
-                'error_template': None,
-            })
+            steps.append(
+                {
+                    "number": i + 1,
+                    "subagent": "agent",
+                    "name": f"step_{i + 1}",
+                    "title": f"Step {i + 1}",
+                    "content": clean_ref,
+                    "data_sources": {},
+                    "error_template": None,
+                }
+            )
 
         # Sort steps by number
-        steps.sort(key=lambda x: x['number'])
+        steps.sort(key=lambda x: x["number"])
 
         return AgentOSInstruction(
             description=description,
@@ -107,44 +109,57 @@ class InstructionParser:
             version="1.0",
             encoding="UTF-8",
             process_flow=ProcessFlow(
-                steps=steps,
-                pre_flight_check=None,
-                post_flight_check=None
+                steps=steps, pre_flight_check=None, post_flight_check=None
             ),
             metadata={
-                'source_path': str(source_path) if source_path else None,
-                'sub_instructions': sub_instructions,
+                "source_path": str(source_path) if source_path else None,
+                "sub_instructions": sub_instructions,
             },
-            raw_content=content
+            raw_content=content,
         )
 
-    def _parse_globs(self, globs_str: str) -> Dict[str, Any]:
+    def _parse_globs(self, globs_str: str) -> dict[str, Any]:
         """Parse the globs configuration from frontmatter."""
         try:
             import json
+
             return json.loads(globs_str)
         except json.JSONDecodeError:
             return {}
 
     def _extract_process_flow(self, content: str) -> ProcessFlow:
         """Extract process flow from instruction content."""
-        process_flow_match = re.search(r'<process_flow>(.*?)</process_flow>', content, re.DOTALL)
+        process_flow_match = re.search(
+            r"<process_flow>(.*?)</process_flow>", content, re.DOTALL
+        )
         if not process_flow_match:
             return ProcessFlow()
 
         flow_content = process_flow_match.group(1)
 
         # Extract pre-flight check
-        pre_flight_match = re.search(r'<pre_flight_check>(.*?)</pre_flight_check>', flow_content, re.DOTALL)
-        pre_flight_check = pre_flight_match.group(1).strip() if pre_flight_match else None
+        pre_flight_match = re.search(
+            r"<pre_flight_check>(.*?)</pre_flight_check>", flow_content, re.DOTALL
+        )
+        pre_flight_check = (
+            pre_flight_match.group(1).strip() if pre_flight_match else None
+        )
 
         # Extract post-flight check
-        post_flight_match = re.search(r'<post_flight_check>(.*?)</post_flight_check>', flow_content, re.DOTALL)
-        post_flight_check = post_flight_match.group(1).strip() if post_flight_match else None
+        post_flight_match = re.search(
+            r"<post_flight_check>(.*?)</post_flight_check>", flow_content, re.DOTALL
+        )
+        post_flight_check = (
+            post_flight_match.group(1).strip() if post_flight_match else None
+        )
 
         # Extract steps
         steps = []
-        step_matches = re.finditer(r'<step[^>]*number="(\d+)"[^>]*subagent="([^"]*)"[^>]*name="([^"]*)"[^>]*>(.*?)</step>', flow_content, re.DOTALL)
+        step_matches = re.finditer(
+            r'<step[^>]*number="(\d+)"[^>]*subagent="([^"]*)"[^>]*name="([^"]*)"[^>]*>(.*?)</step>',
+            flow_content,
+            re.DOTALL,
+        )
 
         for match in step_matches:
             step_number = int(match.group(1))
@@ -153,7 +168,7 @@ class InstructionParser:
             step_content = match.group(4)
 
             # Extract title
-            title_match = re.search(r'### Step \d+: (.+)', step_content)
+            title_match = re.search(r"### Step \d+: (.+)", step_content)
             title = title_match.group(1) if title_match else name
 
             # Extract data sources
@@ -162,54 +177,57 @@ class InstructionParser:
             # Extract error template
             error_template = self._extract_error_template(step_content)
 
-            steps.append({
-                'number': step_number,
-                'subagent': subagent,
-                'name': name,
-                'title': title,
-                'content': step_content.strip(),
-                'data_sources': data_sources,
-                'error_template': error_template,
-            })
+            steps.append(
+                {
+                    "number": step_number,
+                    "subagent": subagent,
+                    "name": name,
+                    "title": title,
+                    "content": step_content.strip(),
+                    "data_sources": data_sources,
+                    "error_template": error_template,
+                }
+            )
 
         # Sort steps by number
-        steps.sort(key=lambda x: x['number'])
+        steps.sort(key=lambda x: x["number"])
 
         return ProcessFlow(
             steps=steps,
             pre_flight_check=pre_flight_check,
-            post_flight_check=post_flight_check
+            post_flight_check=post_flight_check,
         )
 
-    def _extract_data_sources(self, step_content: str) -> Dict[str, Any]:
+    def _extract_data_sources(self, step_content: str) -> dict[str, Any]:
         """Extract data sources from step content."""
-        data_sources_match = re.search(r'<data_sources>(.*?)</data_sources>', step_content, re.DOTALL)
+        data_sources_match = re.search(
+            r"<data_sources>(.*?)</data_sources>", step_content, re.DOTALL
+        )
         if not data_sources_match:
             return {}
 
         sources_content = data_sources_match.group(1)
 
         # Extract primary source
-        primary_match = re.search(r'<primary>(.*?)</primary>', sources_content)
+        primary_match = re.search(r"<primary>(.*?)</primary>", sources_content)
         primary = primary_match.group(1).strip() if primary_match else None
 
         # Extract fallback sequence
         fallback_sequence = []
-        fallback_matches = re.finditer(r'\d+\.\s*(.+)', sources_content)
+        fallback_matches = re.finditer(r"\d+\.\s*(.+)", sources_content)
         for match in fallback_matches:
             fallback_sequence.append(match.group(1).strip())
 
-        return {
-            'primary': primary,
-            'fallback_sequence': fallback_sequence
-        }
+        return {"primary": primary, "fallback_sequence": fallback_sequence}
 
-    def _extract_error_template(self, step_content: str) -> Optional[str]:
+    def _extract_error_template(self, step_content: str) -> str | None:
         """Extract error template from step content."""
-        error_template_match = re.search(r'<error_template>(.*?)</error_template>', step_content, re.DOTALL)
+        error_template_match = re.search(
+            r"<error_template>(.*?)</error_template>", step_content, re.DOTALL
+        )
         return error_template_match.group(1).strip() if error_template_match else None
 
-    def list_available_instructions(self, category: Optional[str] = None) -> List[Path]:
+    def list_available_instructions(self, category: str | None = None) -> list[Path]:
         """
         List available Agent OS instruction files.
 
@@ -233,7 +251,9 @@ class InstructionParser:
         # Search all command directories for .md files
         return list(instructions_dir.rglob("*.md"))
 
-    def load_instruction(self, name: str, category: Optional[str] = None) -> Optional[AgentOSInstruction]:
+    def load_instruction(
+        self, name: str, category: str | None = None
+    ) -> AgentOSInstruction | None:
         """
         Load an Agent OS instruction by name.
 
@@ -245,27 +265,21 @@ class InstructionParser:
             Parsed instruction or None if not found
         """
         instructions_dir = self.instructions_path
-        print(f"DEBUG: Loading instruction '{name}' from {instructions_dir}")
 
         # Try to find the instruction file
         if category:
             # Look in specific category directory
             instruction_file = instructions_dir / category / f"{name}.md"
-            print(f"DEBUG: Looking for instruction file at: {instruction_file}")
             if instruction_file.exists():
-                print(f"DEBUG: Found instruction file: {instruction_file}")
                 return self.parse_instruction_file(instruction_file)
         else:
             # Search recursively for the instruction
-            print(f"DEBUG: Searching recursively for {name}.md in {instructions_dir}")
             for instruction_file in instructions_dir.rglob(f"{name}.md"):
-                print(f"DEBUG: Found instruction file: {instruction_file}")
                 return self.parse_instruction_file(instruction_file)
 
-        print(f"DEBUG: Instruction '{name}' not found")
         return None
 
-    def resolve_agent_reference(self, reference: str) -> Optional[Path]:
+    def resolve_agent_reference(self, reference: str) -> Path | None:
         """
         Resolve an agent reference to a file path.
 
@@ -276,13 +290,15 @@ class InstructionParser:
             Path to the agent file or None if not found
         """
         # Handle Agent OS agent references
-        if reference.startswith('@~/.agent-os/agents/'):
-            agent_name = reference.replace('@~/.agent-os/agents/', '').replace('.md', '')
+        if reference.startswith("@~/.agent-os/agents/"):
+            agent_name = reference.replace("@~/.agent-os/agents/", "").replace(
+                ".md", ""
+            )
             agent_path = self.agents_path / f"{agent_name}.md"
             return agent_path if agent_path.exists() else None
 
         # Handle instruction references
-        elif reference.startswith('@~/.agent-os/instructions/'):
+        if reference.startswith("@~/.agent-os/instructions/"):
             instruction_path = self.agent_os_path / reference[1:]  # Remove @
             return instruction_path if instruction_path.exists() else None
 

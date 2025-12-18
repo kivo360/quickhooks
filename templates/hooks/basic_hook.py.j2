@@ -1,0 +1,110 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+# ]
+# ///
+"""
+{{ description }}
+
+{{ capabilities | join(', ') | title }}
+"""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Any, Dict
+
+from pydantic import BaseModel, Field
+
+
+class {{ class_name }}Input(BaseModel):
+    """Input schema for {{ class_name }} hook."""
+
+    {% for field in input_fields %}
+    {{ field.name }}: {{ field.type }} = Field(
+        {% if field.required %}...{% else %}{{ field.default }}{% endif %},
+        description="{{ field.description }}"
+    )
+    {% endfor %}
+
+
+class {{ class_name }}Output(BaseModel):
+    """Output schema for {{ class_name }} hook."""
+
+    status: str = Field(..., description="Execution status")
+    data: Dict[str, Any] = Field(default_factory=dict, description="Result data")
+    message: str = Field(..., description="Status message")
+
+
+class {{ class_name }}:
+    """{{ class_name }} hook for QuickHooks.
+
+    {{ description }}
+    """
+
+    def __init__(self):
+        """Initialize the hook."""
+        pass
+
+    async def execute(self, input_data: {{ class_name }}Input) -> {{ class_name }}Output:
+        """Execute the {{ class_name }} hook.
+
+        Args:
+            input_data: The input data for the hook
+
+        Returns:
+            {{ class_name }}Output: The result of the hook execution
+        """
+        try:
+            # TODO: Implement your hook logic here
+            result_data = {}
+
+            # Example processing logic:
+            {% for example in examples %}
+            # {{ example }}
+            {% endfor %}
+
+            return {{ class_name }}Output(
+                status="success",
+                data=result_data,
+                message="{{ class_name }} executed successfully"
+            )
+
+        except Exception as e:
+            return {{ class_name }}Output(
+                status="error",
+                data={},
+                message=f"{{ class_name }} failed: {str(e)}"
+            )
+
+
+async def main():
+    """Main entry point for the hook."""
+    # Read input from stdin
+    input_json = sys.stdin.read()
+
+    try:
+        input_data = {{ class_name }}Input.model_validate_json(input_json)
+    except Exception as e:
+        error_output = {
+            "status": "error",
+            "data": {},
+            "message": f"Invalid input: {str(e)}"
+        }
+        print(json.dumps(error_output, indent=2))
+        sys.exit(1)
+
+    # Create and run hook
+    hook = {{ class_name }}()
+    result = await hook.execute(input_data)
+
+    # Output result
+    print(json.dumps(result.model_dump(), indent=2))
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

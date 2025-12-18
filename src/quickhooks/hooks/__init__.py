@@ -9,8 +9,8 @@ from .parallel import DataParallelHook, MultiHookProcessor, ParallelHook, Pipeli
 
 __all__ = [
     "BaseHook",
-    "ParallelHook",
-    "MultiHookProcessor",
     "DataParallelHook",
+    "MultiHookProcessor",
+    "ParallelHook",
     "PipelineHook",
 ]

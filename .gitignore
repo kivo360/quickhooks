@@ -158,3 +158,21 @@ agent_db/
 .DS_Store
 Thumbs.db
 EOF < /dev/null
+*.pyo
+# IDE
+*.pyc
+node_modules/
+.tscache/
+*.tsbuildinfo
+# Cache
+# Virtual environment
+*~
+# OS
+*.swo
+# Build artifacts
+.env/
+*.swp
+.venv/
+# Logs
+# Backups
+logs/

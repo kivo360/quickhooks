@@ -1,19 +1,19 @@
-import quickhooks.hooks.base
-import quickhooks.models
+from quickhooks.hooks.base import BaseHook
+from quickhooks.models import ExecutionContext, HookInput, HookOutput, HookStatus
+
 
 class TestHook(BaseHook):
-    &#34;&#34;&#34;A test hook for validation&#34;&#34;&#34;
-    name = &#34;test_hook&#34;
-    description = &#34;A test hook for validation&#34;
+    """A test hook for validation"""
+
+    name = "test_hook"
+    description = "A test hook for validation"
     version = "1.0.0"
-    
-    def process(self, hook_input: HookInput) -&gt; HookOutput:
-    &#34;&#34;&#34;Process the hook input and return output.&#34;&#34;&#34;
+
+    async def execute(
+        self, input_data: HookInput, context: ExecutionContext
+    ) -> HookOutput:
+        """Process the hook input and return output."""
         # TODO: Implement hook logic here
         return HookOutput(
-            allowed=True,
-            modified=False,
-            tool_name=hook_input.tool_name,
-            tool_input=hook_input.tool_input,
-            message="Hook processed successfully"
+            status=HookStatus.SUCCESS, data={}, message="Hook processed successfully"
         )

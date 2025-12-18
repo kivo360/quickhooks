@@ -1,0 +1,159 @@
+#!/usr/bin/env -S uv run -s
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "anyio>=4.0.0",
+#     "pydantic>=2.5.0",
+#     "pytest>=7.0.0",
+#     "pytest-asyncio>=0.21.0",
+# ]
+# ///
+"""
+Test suite for {{ class_name }} basic hook.
+
+This test suite validates that the {{ class_name }} hook correctly
+executes its core functionality.
+"""
+
+import asyncio
+import json
+import pytest
+from typing import Any, Dict
+
+# Import the hook to test
+from {{ hook_name }} import {{ class_name }}, {{ class_name }}Input
+
+
+class Test{{ class_name }}:
+    """Test cases for {{ class_name }} basic hook."""
+
+    @pytest.fixture
+    def hook(self):
+        """Create {{ class_name }} hook instance."""
+        return {{ class_name }}()
+
+    @pytest.mark.asyncio
+    async def test_hook_initialization(self, hook):
+        """Test that the hook initializes correctly."""
+
+        assert hook is not None
+        assert hasattr(hook, 'execute')
+
+    @pytest.mark.asyncio
+    async def test_basic_execution(self, hook):
+        """Test basic hook execution with valid input."""
+
+        # Prepare minimal valid input
+        test_input = {{ class_name }}Input(**{{ basic_test_input | default({'test_field': 'test_value'}) }})
+
+        # Execute hook
+        result = await hook.execute(test_input)
+
+        # Basic assertions - adjust based on your hook's actual behavior
+        assert result is not None
+        assert hasattr(result, 'status')
+        assert hasattr(result, 'message')
+
+    @pytest.mark.asyncio
+    async def test_input_validation(self, hook):
+        """Test input validation behavior."""
+
+        # Test with valid input
+        valid_input = {{ class_name }}Input(**{{ valid_test_input | default({'test_field': 'valid_value'}) }})
+
+        result = await hook.execute(valid_input)
+
+        # Should succeed with valid input
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_error_handling(self, hook):
+        """Test error handling with invalid input."""
+
+        # Test with potentially problematic input
+        try:
+            invalid_input = {{ class_name }}Input(**{{ invalid_test_input | default({'test_field': None}) }})
+
+            result = await hook.execute(invalid_input)
+
+            # Should handle errors gracefully
+            assert result is not None
+        except Exception as e:
+            # If exceptions are expected, verify they're meaningful
+            assert str(e)  # Should have some error message
+
+    @pytest.mark.asyncio
+    async def test_json_serialization(self, hook):
+        """Test that hook input/output is JSON serializable."""
+
+        # Test input serialization
+        test_input_dict = {{ json_test_input | default({'test_field': 'test_value'}) }}
+
+        # Should be able to create input from dict
+        test_input = {{ class_name }}Input(**test_input_dict)
+
+        # Execute hook
+        result = await hook.execute(test_input)
+
+        # Result should be serializable
+        try:
+            result_dict = result.model_dump() if hasattr(result, 'model_dump') else vars(result)
+            json.dumps(result_dict)
+        except (TypeError, ValueError) as e:
+            pytest.fail(f"Result is not JSON serializable: {e}")
+
+    def test_hook_configuration(self):
+        """Test hook configuration and setup."""
+
+        # Test that we can create multiple instances
+        hook1 = {{ class_name }}()
+        hook2 = {{ class_name }}()
+
+        assert hook1 is not None
+        assert hook2 is not None
+        assert hook1 is not hook2  # Different instances
+
+    @pytest.mark.asyncio
+    async def test_concurrent_execution(self, hook):
+        """Test hook can handle concurrent execution."""
+
+        # Create multiple tasks
+        tasks = []
+        for i in range(3):
+            test_input = {{ class_name }}Input(**{{ concurrent_test_input | default({'test_field': f'concurrent_test_{i}'}) }})
+            task = asyncio.create_task(hook.execute(test_input))
+            tasks.append(task)
+
+        # Wait for all to complete
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Verify all completed successfully (or handled errors gracefully)
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                # Exceptions should be meaningful
+                assert str(result)
+            else:
+                assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_performance_basic(self, hook):
+        """Basic performance test - should complete quickly."""
+
+        import time
+
+        test_input = {{ class_name }}Input(**{{ performance_test_input | default({'test_field': 'performance_test'}) }})
+
+        start_time = time.time()
+        result = await hook.execute(test_input)
+        end_time = time.time()
+
+        # Should complete within reasonable time (adjust threshold as needed)
+        execution_time = end_time - start_time
+        assert execution_time < 5.0  # 5 seconds max for basic operation
+
+        assert result is not None
+
+
+if __name__ == "__main__":
+    # Run tests directly
+    pytest.main([__file__, "-v"])
